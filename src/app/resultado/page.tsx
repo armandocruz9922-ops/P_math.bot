@@ -213,23 +213,50 @@ export default function ResultPage() {
           </p>
         </div>
 
-        {/* Detected Equation Card with LatexEditor (8 cols) */}
-        <div className="lg:col-span-8 rounded-3xl bg-gradient-to-br from-slate-900/90 via-slate-900 to-slate-950 border border-slate-800/90 p-6 sm:p-8 backdrop-blur-xl shadow-xl flex flex-col justify-between relative overflow-hidden print:border-gray-300">
+        {/* Detected Equation Card with 3 Sections (8 cols) */}
+        <div className="lg:col-span-8 rounded-3xl bg-gradient-to-br from-slate-900/95 via-slate-900 to-slate-950 border border-slate-800/90 p-6 sm:p-8 backdrop-blur-xl shadow-xl flex flex-col justify-between relative overflow-hidden space-y-5 print:border-gray-300">
           <div className="absolute -top-16 -right-16 w-48 h-48 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
 
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          {/* 1. SECCIÓN SUPERIOR (NUEVA): Fórmula Detectada en la Imagen (Dominio del Tiempo f(t)) */}
+          <div className="rounded-2xl bg-slate-950/70 border border-amber-500/30 p-4 sm:p-5 shadow-inner space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-300">
+                  Fórmula Detectada en la Imagen (Dominio del Tiempo f(t))
+                </h4>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 font-mono">
+                Dominio Temporal (t) | Texto Literal OCR
+              </span>
+            </div>
+
+            <div className="py-3 px-4 rounded-xl bg-slate-900/80 border border-slate-800/80 flex items-center justify-center overflow-x-auto my-1">
+              <MathRenderer 
+                math={currentSolution.timeDomainLatex || currentSolution.detectedLatex} 
+                displayMode={true} 
+                showCopy={true} 
+              />
+            </div>
+            <p className="text-[10px] text-slate-400">
+              Transcripción literal exacta leída de la imagen recortada del pizarrón o cuaderno.
+            </p>
+          </div>
+
+          {/* 2. SECCIÓN INTERMEDIA: Fórmula Reconocida en Frecuencia Compleja (F(s) / G(s)) */}
+          <div className="rounded-2xl bg-slate-950/90 border border-cyan-500/40 p-4 sm:p-5 shadow-lg space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">
-                  Fórmula Reconocida en Frecuencia Compleja
+                <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-cyan-300">
+                  Fórmula Reconocida en Frecuencia Compleja (F(s) / G(s))
                 </h3>
               </div>
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                  {currentSolution.equationType}
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 font-mono">
+                  Frecuencia Compleja (s) | Transformada Calculada
                 </span>
-                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                   {Math.round(currentSolution.confidenceScore * 100)}% Certeza
                 </span>
               </div>
@@ -237,39 +264,54 @@ export default function ResultPage() {
 
             {/* LaTeX Display or Active Editor */}
             {!isEditingLatex ? (
-              <div className="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 shadow-inner flex flex-col items-center justify-center my-4 group relative overflow-x-auto">
-                <MathRenderer math={currentSolution.detectedLatex} displayMode={true} showCopy={true} />
+              <div className="p-4 sm:p-5 rounded-xl bg-slate-900 border border-cyan-500/20 shadow-inner flex flex-col items-center justify-center my-2 group relative overflow-x-auto">
+                <MathRenderer 
+                  math={currentSolution.frequencyDomainLatex || currentSolution.detectedLatex} 
+                  displayMode={true} 
+                  showCopy={true} 
+                />
                 <span className="text-[10px] font-mono text-slate-500 mt-2">
-                  LaTeX: {currentSolution.detectedLatex}
+                  LaTeX: {currentSolution.frequencyDomainLatex || currentSolution.detectedLatex}
                 </span>
               </div>
             ) : (
               <div className="my-2">
                 <LatexEditor
-                  initialLatex={currentSolution.detectedLatex}
+                  initialLatex={currentSolution.frequencyDomainLatex || currentSolution.detectedLatex}
                   onApply={handleApplyLatexEdit}
                   onCancel={() => setIsEditingLatex(false)}
                   isRecalculating={isProcessing}
                 />
               </div>
             )}
+
+            <div className="flex items-center justify-between pt-1 text-xs">
+              <div className="text-slate-400 flex items-center gap-1.5">
+                <span className="font-semibold text-slate-300">Método:</span>
+                <span>{currentSolution.methodUsed}</span>
+              </div>
+
+              {!isEditingLatex && (
+                <button
+                  onClick={() => setIsEditingLatex(true)}
+                  className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 font-semibold hover:underline cursor-pointer print:hidden"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Corregir / Editar LaTeX</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center justify-between pt-2 text-xs border-t border-slate-800/80">
-            <div className="text-slate-400 flex items-center gap-1.5">
-              <span className="font-semibold text-slate-300">Método:</span>
-              <span>{currentSolution.methodUsed}</span>
+          {/* 3. SECCIÓN INFERIOR (NUEVA): Nota Explicativa / "¿Por qué cambia al Dominio s?" */}
+          <div className="rounded-2xl bg-gradient-to-r from-blue-950/30 via-slate-950 to-cyan-950/30 border border-blue-500/30 p-4 sm:p-5 shadow-md space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-cyan-300">
+              <Compass className="w-4 h-4 text-cyan-400 shrink-0" />
+              <span>¿Por qué la fórmula cambia del dominio t al dominio s?</span>
             </div>
-
-            {!isEditingLatex && (
-              <button
-                onClick={() => setIsEditingLatex(true)}
-                className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 font-semibold hover:underline cursor-pointer print:hidden"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Corregir / Editar LaTeX</span>
-              </button>
-            )}
+            <p className="text-xs text-slate-300 leading-relaxed">
+              La Transformada de Laplace $\mathcal&#123;L&#125;&#123;f(t)&#125;$ convierte ecuaciones del dominio del tiempo ($t$) al dominio de la frecuencia compleja ($s = \sigma + j\omega$). Este cambio convierte ecuaciones diferenciales complejas en multiplicaciones algebraicas sencillas, lo que permite analizar la estabilidad del sistema, sus polos, ceros y el tiempo de asentamiento ($t_s$).
+            </p>
           </div>
         </div>
       </div>

@@ -142,11 +142,20 @@ export interface PartialFractionTerm {
   method: string;
 }
 
+export interface LaplaceResult {
+  timeDomainLatex: string;        // Ej: "f(t) = e^{-2t} \cos(3t)"
+  frequencyDomainLatex: string;   // Ej: "F(s) = \frac{s+2}{(s+2)^2 + 9}"
+  explanation: string;            // Explicación de la propiedad aplicada
+}
+
 export interface EquationSolution {
   id: string;
   originalImage: string;
   croppedImage?: string;
   detectedLatex: string;
+  timeDomainLatex?: string;
+  frequencyDomainLatex?: string;
+  domainTransitionExplanation?: string;
   confidenceScore: number;
   equationType: string;
   methodUsed: string;

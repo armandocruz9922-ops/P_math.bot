@@ -112,18 +112,14 @@ Debes responder ÚNICAMENTE con un objeto JSON válido (sin markdown exterior) c
       }
     }
 
-    // 4. Modo Local Predeterminado para Laplace
-    const laplaceSolution = solveTransferFunction(
-      25, 1, 4, 25,
-      imageBase64 || '/samples/pizarron-rlc.svg',
-      'upload'
+    // Si no se pudo procesar la imagen con el modelo de visión ni es manual
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'No se pudo interpretar la fórmula en la imagen recortada. Por favor reajusta el recuadro' 
+      },
+      { status: 400 }
     );
-
-    return NextResponse.json({
-      success: true,
-      source: 'laplace_engine',
-      solution: laplaceSolution
-    });
 
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : 'Error desconocido al procesar ecuación';

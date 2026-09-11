@@ -1,6 +1,6 @@
 import { EquationSolution, ProcessingPhase, CalculationMode } from './types';
 import { getSampleSolution } from './sample-equations';
-import { parseAndSolveLaplace, validateLaplaceDomain, solveTransferFunction } from './laplace-solver';
+import { parseAndSolveLaplace, validateLaplaceDomain } from './laplace-solver';
 
 export interface SolveOptions {
   imageBase64?: string;
@@ -16,21 +16,21 @@ export async function processChalkboardImage(options: SolveOptions): Promise<Equ
 
   // Phase 1: Uploading / Reading input
   onPhaseChange?.('uploading', 15);
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise(r => setTimeout(r, 250));
 
   // Phase 2: Scanning chalkboard
   onPhaseChange?.('scanning_board', 35);
-  await new Promise(r => setTimeout(r, 400));
+  await new Promise(r => setTimeout(r, 300));
 
   // Phase 3: Extracting formula (OCR)
   onPhaseChange?.('extracting_ocr', 60);
-  await new Promise(r => setTimeout(r, 350));
+  await new Promise(r => setTimeout(r, 300));
 
   // Phase 4: Validating Laplace & Control domain
   onPhaseChange?.('validating_domain', 75);
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise(r => setTimeout(r, 200));
 
-  // If sample preset selected directly
+  // 1. If sample preset selected directly by clicking a sample card
   if (sampleId) {
     onPhaseChange?.('verifying_proof', 90);
     await new Promise(r => setTimeout(r, 200));
@@ -39,10 +39,10 @@ export async function processChalkboardImage(options: SolveOptions): Promise<Equ
     return solution;
   }
 
-  // If manual LaTeX supplied
+  // 2. If manual LaTeX supplied by user
   if (manualLatex && manualLatex.trim().length > 0) {
     onPhaseChange?.('solving_math', 85);
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 250));
 
     const domain = validateLaplaceDomain(manualLatex);
     const solution = parseAndSolveLaplace(
@@ -52,6 +52,10 @@ export async function processChalkboardImage(options: SolveOptions): Promise<Equ
       imageBase64 ? 'upload' : 'sample'
     );
     solution.domainValidation = domain;
+    solution.timeDomainLatex = manualLatex;
+    solution.frequencyDomainLatex = solution.detectedLatex;
+    solution.domainTransitionExplanation = 
+      'La Transformada de Laplace \\mathcal{L}\\{f(t)\\} convierte ecuaciones del dominio del tiempo (t) al dominio de la frecuencia compleja (s = \\sigma + j\\omega). Este cambio convierte ecuaciones diferenciales complejas en multiplicaciones algebraicas sencillas, lo que permite analizar la estabilidad del sistema, sus polos, ceros y el tiempo de asentamiento (t_s).';
 
     onPhaseChange?.('verifying_proof', 95);
     await new Promise(r => setTimeout(r, 200));
@@ -59,41 +63,37 @@ export async function processChalkboardImage(options: SolveOptions): Promise<Equ
     return solution;
   }
 
-  // Try API route
-  try {
-    const res = await fetch('/api/solve-equation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        imageBase64,
-        sampleId,
-        manualLatex,
-        calculationMode,
-        userApiKey
-      })
-    });
+  // 3. Process Real Cropped Image via /api/process-image
+  if (imageBase64) {
+    onPhaseChange?.('solving_math', 85);
 
-    if (res.ok) {
+    try {
+      const res = await fetch('/api/process-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64,
+          userApiKey,
+          calculationMode
+        })
+      });
+
       const data = await res.json();
-      if (data.success && data.solution) {
+
+      if (res.ok && data.success && data.solution) {
         onPhaseChange?.('verifying_proof', 95);
         await new Promise(r => setTimeout(r, 200));
         onPhaseChange?.('completed', 100);
         return data.solution;
+      } else {
+        const errorMsg = data.error || 'No se pudo interpretar la fórmula en la imagen recortada. Por favor reajusta el recuadro';
+        throw new Error(errorMsg);
       }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'No se pudo interpretar la fórmula en la imagen recortada. Por favor reajusta el recuadro';
+      throw new Error(msg);
     }
-  } catch (err) {
-    console.warn('Fallo en endpoint /api/solve-equation, utilizando motor de Laplace local:', err);
   }
 
-  // Fallback to standard 2nd order underdamped transfer function
-  onPhaseChange?.('verifying_proof', 95);
-  await new Promise(r => setTimeout(r, 200));
-  const fallback = solveTransferFunction(
-    25, 1, 4, 25,
-    imageBase64 || '/samples/pizarron-rlc.svg',
-    imageBase64 ? 'upload' : 'sample'
-  );
-  onPhaseChange?.('completed', 100);
-  return fallback;
+  throw new Error('No se ha proporcionado ninguna imagen ni fórmula para procesar.');
 }

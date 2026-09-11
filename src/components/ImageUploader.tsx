@@ -47,7 +47,8 @@ export const ImageUploader: React.FC = () => {
   const [isCroppingOpen, setIsCroppingOpen] = useState(false);
   const [isEditingLatex, setIsEditingLatex] = useState(false);
   const [manualLatex, setManualLatex] = useState<string>('');
-  const [selectedSampleId, setSelectedSampleId] = useState<string | null>('tf_subamortiguado');
+  const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [domainAlert, setDomainAlert] = useState<{ show: boolean; message: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -113,6 +114,7 @@ export const ImageUploader: React.FC = () => {
     setCroppedImage(null);
     setSelectedSampleId(null);
     setManualLatex('');
+    setErrorMessage(null);
     setDomainAlert(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -120,6 +122,8 @@ export const ImageUploader: React.FC = () => {
   };
 
   const handleSolve = async () => {
+    setErrorMessage(null);
+
     // Check domain restriction if manual latex is present
     if (manualLatex && manualLatex.trim()) {
       const validation = validateLaplaceDomain(manualLatex);
@@ -132,13 +136,21 @@ export const ImageUploader: React.FC = () => {
       }
     }
 
-    await solveEquation(
+    // Only pass sampleId if user clicked a preset and didn't upload a custom image
+    const hasCustomImage = Boolean(croppedImage || currentImage);
+    const effectiveSampleId = hasCustomImage && !selectedSampleId ? undefined : selectedSampleId;
+
+    const success = await solveEquation(
       currentImage || undefined, 
-      selectedSampleId || undefined, 
+      effectiveSampleId || undefined, 
       manualLatex || undefined, 
       croppedImage || undefined,
       calculationMode
     );
+
+    if (!success) {
+      setErrorMessage('No se pudo interpretar la fórmula en la imagen recortada. Por favor reajusta el recuadro');
+    }
   };
 
   // Sample active formula text
@@ -382,7 +394,7 @@ export const ImageUploader: React.FC = () => {
               {/* LaTeX Editor Section (if editing) or Detected Equation Card */}
               {isEditingLatex ? (
                 <LatexEditor
-                  initialLatex={manualLatex || currentSample?.latex || 'G(s) = \\frac{25}{s^2 + 4s + 25}'}
+                  initialLatex={manualLatex || currentSample?.latex || ''}
                   onApply={(newLatex) => {
                     setManualLatex(newLatex);
                     setIsEditingLatex(false);
@@ -394,24 +406,41 @@ export const ImageUploader: React.FC = () => {
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-slate-300 flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                      Fórmula detectada en el pizarrón:
+                      Fórmula del Pizarrón:
                     </span>
                     <button
                       onClick={() => setIsEditingLatex(true)}
                       className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
-                      <span>Editar LaTeX</span>
+                      <span>Editar o Ingresar LaTeX</span>
                     </button>
                   </div>
 
                   <div className="p-3 rounded-xl bg-slate-900 border border-slate-800/80 flex items-center justify-center overflow-x-auto text-sm font-mono text-cyan-300">
-                    {manualLatex || currentSample?.latex || 'G(s) = \\frac{25}{s^2 + 4s + 25}'}
+                    {manualLatex || currentSample?.latex || (
+                      <span className="text-slate-400 text-xs italic">
+                        [Foto recortada lista para análisis por Visión AI]
+                      </span>
+                    )}
                   </div>
 
                   <p className="text-[11px] text-slate-400 text-center">
-                    💡 Puedes corregir o ingresar cualquier función en LaTeX antes de procesar haciendo clic en &quot;Editar LaTeX&quot;.
+                    💡 La fórmula se transcribirá directamente desde tu imagen recortada utilizando el modelo de visión.
                   </p>
+                </div>
+              )}
+
+              {/* Error Message Alert (e.g. incomplete crop or unreadable handwriting) */}
+              {errorMessage && (
+                <div className="p-4 rounded-2xl bg-rose-950/50 border border-rose-500/50 text-rose-300 flex items-start gap-3 animate-fade-in shadow-xl">
+                  <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                  <div className="text-xs space-y-1">
+                    <p className="font-bold text-rose-200">{errorMessage}</p>
+                    <p className="text-[11px] text-slate-300">
+                      Asegúrate de que la imagen recortada contenga los trazos completos de la ecuación o ingresa tu API Key en Configuración (icono ⚙️).
+                    </p>
+                  </div>
                 </div>
               )}
 
