@@ -9,6 +9,7 @@ import { ProcessingOverlay } from './ProcessingOverlay';
 import { LaplaceCropper } from './LaplaceCropper';
 import { LatexEditor } from './LatexEditor';
 import { DataInputModal } from './DataInputModal';
+import { ApiKeyModal } from './ApiKeyModal';
 import { CalculationMode } from '@/lib/types';
 import { validateLaplaceDomain } from '@/lib/laplace-solver';
 import { 
@@ -35,12 +36,16 @@ export const ImageUploader: React.FC = () => {
     setCurrentImage, 
     croppedImage, 
     setCroppedImage,
+    setCurrentSolution,
     calculationMode,
     setCalculationMode,
     solveEquation, 
     isProcessing, 
     processingPhase, 
     processingPercent,
+    userApiKey,
+    isApiKeyModalOpen,
+    setIsApiKeyModalOpen,
     needsInputData,
     setNeedsInputData,
     submitUserParameters
@@ -98,6 +103,15 @@ export const ImageUploader: React.FC = () => {
       if (event.target?.result) {
         setSelectedSampleId(null);
         setCroppedImage(null);
+        setCurrentSolution(null);
+        try {
+          sessionStorage.removeItem('mathboard_laplace_solution');
+          sessionStorage.removeItem('mathboard_laplace_cropped_image');
+        } catch (e) {
+          // Ignorable
+        }
+        setErrorMessage(null);
+        setNeedsInputData(null);
         setCurrentImage(event.target.result as string);
         setIsCroppingOpen(true);
       }
@@ -108,17 +122,27 @@ export const ImageUploader: React.FC = () => {
   const handleSelectSample = (sampleId: string, imagePath: string, mode: CalculationMode) => {
     setSelectedSampleId(sampleId);
     setCroppedImage(null);
+    setCurrentSolution(null);
     setCurrentImage(imagePath);
     setCalculationMode(mode);
     setDomainAlert(null);
+    setErrorMessage(null);
   };
 
   const handleRemoveImage = () => {
     setCurrentImage(null);
     setCroppedImage(null);
     setSelectedSampleId(null);
+    setCurrentSolution(null);
+    try {
+      sessionStorage.removeItem('mathboard_laplace_solution');
+      sessionStorage.removeItem('mathboard_laplace_cropped_image');
+    } catch (e) {
+      // Ignorable
+    }
     setManualLatex('');
     setErrorMessage(null);
+    setNeedsInputData(null);
     setDomainAlert(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -140,9 +164,14 @@ export const ImageUploader: React.FC = () => {
       }
     }
 
-    // Only pass sampleId if user clicked a preset and didn't upload a custom image
     const hasCustomImage = Boolean(croppedImage || currentImage);
     const effectiveSampleId = hasCustomImage && !selectedSampleId ? undefined : selectedSampleId;
+
+    // If user uploaded a custom photo but has neither an API Key nor manual LaTeX, open the setup modal
+    if (hasCustomImage && !effectiveSampleId && !manualLatex?.trim() && !userApiKey?.trim()) {
+      setIsApiKeyModalOpen(true);
+      return;
+    }
 
     const success = await solveEquation(
       currentImage || undefined, 
@@ -152,8 +181,9 @@ export const ImageUploader: React.FC = () => {
       calculationMode
     );
 
-    if (!success) {
-      setErrorMessage('No se pudo interpretar la fórmula en la imagen recortada. Por favor reajusta el recuadro');
+    // Only set error if not waiting for user parameters and not waiting for API key
+    if (!success && !needsInputData && !isApiKeyModalOpen) {
+      setErrorMessage('No se pudo interpretar la fórmula en la imagen recortada. Por favor reajusta el recuadro o escribe la fórmula directamente.');
     }
   };
 
@@ -550,6 +580,9 @@ export const ImageUploader: React.FC = () => {
         onCancel={() => setNeedsInputData(null)}
         isSubmitting={isProcessing}
       />
+
+      {/* Pop-up Modal for Configuring Gemini API Key or Entering Formula */}
+      <ApiKeyModal />
     </>
   );
 };

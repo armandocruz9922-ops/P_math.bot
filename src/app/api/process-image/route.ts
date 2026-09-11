@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            status: 'ERROR',
-            error: 'No se pudo interpretar la fórmula en la imagen recortada. Por favor configura tu API Key de Visión (Gemini u OpenAI) en Configuración (icono ⚙️) para transcribir fotos manuscritas.'
+            status: 'MISSING_API_KEY',
+            error: 'Se requiere una API Key de Gemini (o OpenAI) para transcribir fotos manuscritas automáticamente.'
           },
           { status: 400 }
         );
@@ -166,6 +166,70 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Check if equation is an RLC circuit: contains L, R, C or d_i/dt or \int i
+    const isRlcCircuit = 
+      (lowerRaw.includes('di') || lowerRaw.includes('d_i') || lowerRaw.includes('i(t)') || lowerRaw.includes('\\int')) &&
+      (rawLatex.includes('L') || rawLatex.includes('R') || rawLatex.includes('C'));
+
+    if (isRlcCircuit && (!userParameters || userParameters.R === undefined || userParameters.L === undefined || userParameters.C === undefined)) {
+      const missing_parameters: MissingParameter[] = [
+        {
+          key: 'R',
+          label: 'Resistencia (R)',
+          symbol: 'R (Ω)',
+          placeholder: '10',
+          type: 'number',
+          required: true,
+          description: 'Valor de la resistencia en Ohmios (Ω)'
+        },
+        {
+          key: 'L',
+          label: 'Inductancia (L)',
+          symbol: 'L (H)',
+          placeholder: '1',
+          type: 'number',
+          required: true,
+          description: 'Valor del inductor en Henrios (H)'
+        },
+        {
+          key: 'C',
+          label: 'Capacitancia (C)',
+          symbol: 'C (F)',
+          placeholder: '0.04',
+          type: 'number',
+          required: true,
+          description: 'Valor del condensador en Faradios (ej: 0.04 o 0.001)'
+        },
+        {
+          key: 'i0',
+          label: 'Corriente inicial i(0)',
+          symbol: 'i(0)',
+          placeholder: '0',
+          type: 'number',
+          required: false,
+          description: 'Corriente a través del inductor en t = 0 (por defecto 0 A)'
+        },
+        {
+          key: 'v',
+          label: 'Voltaje de excitación V',
+          symbol: 'V (Voltios)',
+          placeholder: '1',
+          type: 'number',
+          required: false,
+          description: 'Amplitud de la fuente de tensión aplicada (ej. escalón de 1 V)'
+        }
+      ];
+
+      return NextResponse.json({
+        success: false,
+        status: 'NEEDS_INPUT',
+        raw_latex: rawLatex,
+        detected_formula: rawLatex,
+        missing_parameters,
+        message: 'Se detectó un circuito RLC en la foto. Para calcular la transformada y graficar la estabilidad, por favor ingresa los valores de los componentes:'
+      });
+    }
+
     // Check for undefined symbolic constant K (e.g. G(s) = K / (s^2 + ...))
     const hasSymbolicK = /[^\w]K[^\w]|^K[^\w]|[^\w]K$/.test(rawLatex) && !lowerRaw.includes('k=') && !lowerRaw.includes('k =');
     if (hasSymbolicK && (!userParameters || userParameters.k === undefined)) {
@@ -195,6 +259,23 @@ export async function POST(request: NextRequest) {
     // SOLVE COMBINING IMAGE DATA + USER INPUTTED PARAMETERS
     // -------------------------------------------------------------
     let effectiveLatexToSolve = laplaceLatex || rawLatex;
+
+    // If user provided RLC parameters, build exact control transfer function
+    if (userParameters && userParameters.R !== undefined && userParameters.L !== undefined && userParameters.C !== undefined) {
+      const R = Number(userParameters.R);
+      const L = Number(userParameters.L);
+      const C = Number(userParameters.C);
+      const V = userParameters.v !== undefined ? Number(userParameters.v) : 1;
+      const i0 = userParameters.i0 !== undefined ? Number(userParameters.i0) : 0;
+
+      const a2 = 1;
+      const a1 = Number((R / L).toFixed(4));
+      const a0 = Number((1 / (L * C)).toFixed(4));
+      const num = Number((V / L).toFixed(4));
+
+      effectiveLatexToSolve = `G(s) = \\frac{${num}}{s^2 + ${a1}s + ${a0}}`;
+      rawLatex = `v(t) = L \\frac{di}{dt} + R i(t) + \\frac{1}{C} \\int_0^t i(\\tau) d\\tau, \\quad R=${R}\\Omega, \\; L=${L}H, \\; C=${C}F, \\; i(0)=${i0}A`;
+    }
 
     // If user provided initial conditions, combine explicitly
     if (userParameters && (userParameters.y0 !== undefined || userParameters.yPrime0 !== undefined)) {

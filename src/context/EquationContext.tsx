@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { EquationSolution, ProcessingPhase, HistoryEntry, EquationStep, CalculationMode, NeedsInputData } from '@/lib/types';
-import { processChalkboardImage, NeedsInputError } from '@/lib/ocr-solver-service';
+import { processChalkboardImage, NeedsInputError, MissingApiKeyError } from '@/lib/ocr-solver-service';
 import { useRouter } from 'next/navigation';
 
 interface EquationContextType {
@@ -16,6 +16,8 @@ interface EquationContextType {
   userApiKey: string;
   history: HistoryEntry[];
   isHistoryOpen: boolean;
+  isApiKeyModalOpen: boolean;
+  setIsApiKeyModalOpen: (open: boolean) => void;
   explainingStep: EquationStep | null;
   needsInputData: NeedsInputData | null;
   setNeedsInputData: (data: NeedsInputData | null) => void;
@@ -61,6 +63,7 @@ export function EquationProvider({ children }: { children: ReactNode }) {
   const [userApiKey, setUserApiKey] = useState('');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [explainingStep, setExplainingStep] = useState<EquationStep | null>(null);
   const [needsInputData, setNeedsInputData] = useState<NeedsInputData | null>(null);
 
@@ -236,6 +239,14 @@ export function EquationProvider({ children }: { children: ReactNode }) {
       router.push('/resultado');
       return true;
     } catch (error) {
+      if (error instanceof MissingApiKeyError) {
+        setIsApiKeyModalOpen(true);
+        setIsProcessing(false);
+        setProcessingPhase('idle');
+        setProcessingPercent(0);
+        return false;
+      }
+
       if (error instanceof NeedsInputError) {
         setNeedsInputData(error.data);
         setIsProcessing(false);
@@ -245,6 +256,10 @@ export function EquationProvider({ children }: { children: ReactNode }) {
       }
 
       console.error('Error al resolver la transformada de Laplace:', error);
+      setCurrentSolution(null);
+      try {
+        sessionStorage.removeItem(STORAGE_SOLUTION_KEY);
+      } catch (e) {}
       setIsProcessing(false);
       setProcessingPhase('error');
       setProcessingPercent(0);
@@ -295,6 +310,8 @@ export function EquationProvider({ children }: { children: ReactNode }) {
         userApiKey,
         history,
         isHistoryOpen,
+        isApiKeyModalOpen,
+        setIsApiKeyModalOpen,
         explainingStep,
         needsInputData,
         setNeedsInputData,
