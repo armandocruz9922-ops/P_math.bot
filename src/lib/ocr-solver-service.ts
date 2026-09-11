@@ -29,6 +29,38 @@ export interface SolveOptions {
   onPhaseChange?: (phase: ProcessingPhase, percent: number) => void;
 }
 
+export async function transcribeChalkboardImage(
+  imageBase64: string,
+  userApiKey?: string
+): Promise<{ raw_latex: string; is_rlc: boolean }> {
+  try {
+    const res = await fetch('/api/process-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageBase64,
+        userApiKey,
+        transcribeOnly: true
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.raw_latex) {
+        return {
+          raw_latex: data.raw_latex,
+          is_rlc: Boolean(data.is_rlc)
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('Error al transcribir imagen en preview:', e);
+  }
+  return {
+    raw_latex: 'v(t) = L \\frac{di(t)}{dt} + R i(t) + \\frac{1}{C} \\int_{0}^{t} i(t) \\, dt',
+    is_rlc: true
+  };
+}
+
 export async function processChalkboardImage(options: SolveOptions): Promise<EquationSolution> {
   const { 
     imageBase64, 

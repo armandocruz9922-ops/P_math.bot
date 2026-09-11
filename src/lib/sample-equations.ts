@@ -5,11 +5,11 @@ export const SAMPLE_EQUATIONS: SampleBlackboard[] = [
   {
     id: 'circuito_rlc',
     title: 'Circuito RLC Integro-Diferencial',
-    subtitle: '= L di/dt + R i + (1/C) ∫ i dt',
-    latex: '= L \\frac{di(t)}{dt} + R i(t) + \\frac{1}{C} \\int_{0}^{t} i(t) \\, dt',
+    subtitle: 'v(t) = L di/dt + R i + (1/C) ∫ i dt',
+    latex: 'v(t) = L \\frac{di(t)}{dt} + R i(t) + \\frac{1}{C} \\int_{0}^{t} i(t) \\, dt',
     calculationMode: 'transfer_function',
     equationType: 'Circuito Eléctrico RLC',
-    imagePath: '/samples/pizarron-rlc.svg',
+    imagePath: '/samples/cuaderno-rlc.jpg',
     badge: 'RLC Serie',
     stabilityStatus: 'stable'
   },

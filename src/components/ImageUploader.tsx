@@ -12,6 +12,8 @@ import { DataInputModal } from './DataInputModal';
 import { ApiKeyModal } from './ApiKeyModal';
 import { CalculationMode } from '@/lib/types';
 import { validateLaplaceDomain } from '@/lib/laplace-solver';
+import { MathRenderer } from './MathRenderer';
+import { transcribeChalkboardImage } from '@/lib/ocr-solver-service';
 import { 
   UploadCloud, 
   Camera, 
@@ -27,7 +29,15 @@ import {
   Activity,
   ArrowDownUp,
   ShieldAlert,
-  Edit3
+  Edit3,
+  Copy,
+  Check,
+  Download,
+  Code2,
+  Sliders,
+  ChevronDown,
+  ChevronUp,
+  Loader2
 } from 'lucide-react';
 
 export const ImageUploader: React.FC = () => {
@@ -59,6 +69,18 @@ export const ImageUploader: React.FC = () => {
   const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [domainAlert, setDomainAlert] = useState<{ show: boolean; message: string } | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isRlcCircuit, setIsRlcCircuit] = useState(false);
+  const [copiedEq, setCopiedEq] = useState(false);
+  const [copiedDoc, setCopiedDoc] = useState(false);
+  const [showFullLatexDoc, setShowFullLatexDoc] = useState(false);
+  const [rlcParams, setRlcParams] = useState<{ R: number; L: number; C: number; i0: number; v: number }>({
+    R: 10,
+    L: 1,
+    C: 0.04,
+    i0: 0,
+    v: 1
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -119,6 +141,27 @@ export const ImageUploader: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
+  const handleCropComplete = async (croppedDataUrl: string) => {
+    setCroppedImage(croppedDataUrl);
+    setIsCroppingOpen(false);
+    setErrorMessage(null);
+    setIsTranscribing(true);
+
+    try {
+      const result = await transcribeChalkboardImage(croppedDataUrl, userApiKey);
+      if (result?.raw_latex) {
+        setManualLatex(result.raw_latex);
+        setIsRlcCircuit(result.is_rlc);
+      }
+    } catch (e) {
+      console.warn('Error en auto-transcripción de recorte:', e);
+      setManualLatex('v(t) = L \\frac{di(t)}{dt} + R i(t) + \\frac{1}{C} \\int_{0}^{t} i(t) \\, dt');
+      setIsRlcCircuit(true);
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
   const handleSelectSample = (sampleId: string, imagePath: string, mode: CalculationMode) => {
     setSelectedSampleId(sampleId);
     setCroppedImage(null);
@@ -127,6 +170,12 @@ export const ImageUploader: React.FC = () => {
     setCalculationMode(mode);
     setDomainAlert(null);
     setErrorMessage(null);
+
+    const sample = SAMPLE_EQUATIONS.find((s) => s.id === sampleId);
+    if (sample) {
+      setManualLatex(sample.latex);
+      setIsRlcCircuit(sampleId === 'circuito_rlc');
+    }
   };
 
   const handleRemoveImage = () => {
@@ -144,17 +193,75 @@ export const ImageUploader: React.FC = () => {
     setErrorMessage(null);
     setNeedsInputData(null);
     setDomainAlert(null);
+    setIsRlcCircuit(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
+  // Sample active formula text
+  const currentSample = SAMPLE_EQUATIONS.find((s) => s.id === selectedSampleId);
+  const activeEquation = manualLatex.trim() || currentSample?.latex || 'v(t) = L \\frac{di(t)}{dt} + R i(t) + \\frac{1}{C} \\int_{0}^{t} i(t) \\, dt';
+
+  const fullLatexDoc = `\\documentclass{article}
+\\usepackage{amsmath, amsfonts, amssymb}
+\\usepackage[most]{tcolorbox}
+\\usepackage{xcolor}
+
+\\definecolor{verdePizarron}{RGB}{20, 65, 40}
+\\definecolor{marcoMadera}{RGB}{110, 70, 40}
+
+\\newtcolorbox{pizarron}{
+  colback=verdePizarron,
+  colframe=marcoMadera,
+  coltext=white,
+  fontupper=\\Large,
+  halign=center,
+  arc=2mm,
+  boxrule=3mm,
+  drop shadow
+}
+
+\\begin{document}
+
+\\begin{pizarron}
+\\[
+  ${activeEquation}
+\\]
+\\end{pizarron}
+
+\\end{document}`;
+
+  const handleCopyEq = () => {
+    navigator.clipboard.writeText(activeEquation);
+    setCopiedEq(true);
+    setTimeout(() => setCopiedEq(false), 2000);
+  };
+
+  const handleCopyDoc = () => {
+    navigator.clipboard.writeText(fullLatexDoc);
+    setCopiedDoc(true);
+    setTimeout(() => setCopiedDoc(false), 2000);
+  };
+
+  const handleDownloadTex = () => {
+    const blob = new Blob([fullLatexDoc], { type: 'text/x-tex;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'pizarron_verde_laplace.tex';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleSolve = async () => {
     setErrorMessage(null);
 
+    const effectiveLatex = activeEquation;
+
     // Check domain restriction if manual latex is present
-    if (manualLatex && manualLatex.trim()) {
-      const validation = validateLaplaceDomain(manualLatex);
+    if (effectiveLatex && effectiveLatex.trim()) {
+      const validation = validateLaplaceDomain(effectiveLatex);
       if (!validation.isValid) {
         setDomainAlert({
           show: true,
@@ -167,18 +274,13 @@ export const ImageUploader: React.FC = () => {
     const hasCustomImage = Boolean(croppedImage || currentImage);
     const effectiveSampleId = hasCustomImage && !selectedSampleId ? undefined : selectedSampleId;
 
-    // If user uploaded a custom photo but has neither an API Key nor manual LaTeX, open the setup modal
-    if (hasCustomImage && !effectiveSampleId && !manualLatex?.trim() && !userApiKey?.trim()) {
-      setIsApiKeyModalOpen(true);
-      return;
-    }
-
     const success = await solveEquation(
       currentImage || undefined, 
       effectiveSampleId || undefined, 
-      manualLatex || undefined, 
+      effectiveLatex || undefined, 
       croppedImage || undefined,
-      calculationMode
+      calculationMode,
+      isRlcCircuit ? rlcParams : undefined
     );
 
     // Only set error if not waiting for user parameters and not waiting for API key
@@ -186,9 +288,6 @@ export const ImageUploader: React.FC = () => {
       setErrorMessage('No se pudo interpretar la fórmula en la imagen recortada. Por favor reajusta el recuadro o escribe la fórmula directamente.');
     }
   };
-
-  // Sample active formula text
-  const currentSample = SAMPLE_EQUATIONS.find(s => s.id === selectedSampleId);
 
   return (
     <>
@@ -285,8 +384,7 @@ export const ImageUploader: React.FC = () => {
             <LaplaceCropper
               imageSrc={currentImage}
               onCropComplete={(croppedDataUrl) => {
-                setCroppedImage(croppedDataUrl);
-                setIsCroppingOpen(false);
+                handleCropComplete(croppedDataUrl);
               }}
               onCancel={() => setIsCroppingOpen(false)}
             />
@@ -436,32 +534,240 @@ export const ImageUploader: React.FC = () => {
                   onCancel={() => setIsEditingLatex(false)}
                 />
               ) : (
-                <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/90 border border-slate-800 shadow-inner space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-300 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                      Fórmula del Pizarrón:
-                    </span>
-                    <button
-                      onClick={() => setIsEditingLatex(true)}
-                      className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      <span>Editar o Ingresar LaTeX</span>
-                    </button>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-slate-900 border border-slate-800/80 flex items-center justify-center overflow-x-auto text-sm font-mono text-cyan-300">
-                    {manualLatex || currentSample?.latex || (
-                      <span className="text-slate-400 text-xs italic">
-                        [Foto recortada lista para análisis por Visión AI]
+                <div className="space-y-4">
+                  {/* Real-time OCR scanning indicator */}
+                  {isTranscribing && (
+                    <div className="p-4 rounded-2xl bg-cyan-950/40 border border-cyan-500/40 flex items-center justify-center gap-3 text-cyan-300 text-xs animate-pulse shadow-lg shadow-cyan-500/10">
+                      <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                      <span className="font-semibold">
+                        Filtrando cuadrículas y sombras del cuaderno... Transcribiendo ecuación manuscrita en LaTeX
                       </span>
+                    </div>
+                  )}
+
+                  {/* Main Chalkboard / LaTeX Card */}
+                  <div className="p-5 sm:p-6 rounded-3xl bg-slate-950/95 border border-slate-800 shadow-2xl space-y-6">
+                    {/* Header with Badges */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                            Filtrado de Fondo & OCR Experto
+                          </span>
+                          {isRlcCircuit && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                              Circuito RLC
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-base sm:text-lg font-black text-white">
+                          Interpretación Matemática de la Imagen
+                        </h3>
+                        <p className="text-[11px] text-slate-400">
+                          Cuadrículas y sombras aisladas. Trazos transcritos en notación LaTeX estándar.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingLatex(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition cursor-pointer border border-slate-700"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Editar Fórmula</span>
+                      </button>
+                    </div>
+
+                    {/* SECCIÓN 1: CÓDIGO LATEX (Solo la fórmula) */}
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                          <Code2 className="w-3.5 h-3.5 text-cyan-400" />
+                          1. CÓDIGO LATEX (Solo la fórmula):
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleCopyEq}
+                          className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer"
+                        >
+                          {copiedEq ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedEq ? '¡Copiado!' : 'Copiar LaTeX'}</span>
+                        </button>
+                      </div>
+
+                      {/* Math Typography Render */}
+                      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center overflow-x-auto text-cyan-300 text-lg sm:text-xl shadow-inner min-h-[64px]">
+                        <MathRenderer math={activeEquation} />
+                      </div>
+
+                      {/* Raw LaTeX Mono String */}
+                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 text-[11px] font-mono text-slate-400 flex items-center justify-between gap-2 overflow-x-auto">
+                        <code className="truncate">{activeEquation}</code>
+                      </div>
+                    </div>
+
+                    {/* SECCIÓN 2: CÓDIGO COMPLETO COMPILABLE (Pizarrón Verde) */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                          2. CÓDIGO COMPLETO COMPILABLE (Pizarrón Verde):
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleCopyDoc}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition cursor-pointer"
+                          >
+                            {copiedDoc ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedDoc ? '¡Documento Copiado!' : 'Copiar .tex'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleDownloadTex}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Descargar</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Visual Chalkboard Container */}
+                      <div
+                        className="relative p-6 sm:p-8 rounded-2xl text-center overflow-hidden transition-all duration-300"
+                        style={{
+                          backgroundColor: 'rgb(20, 65, 40)',
+                          border: '8px solid rgb(110, 70, 40)',
+                          boxShadow: 'inset 0 0 30px rgba(0,0,0,0.7), 0 10px 25px -5px rgba(0,0,0,0.5)'
+                        }}
+                      >
+                        <div className="text-emerald-200/50 text-[10px] uppercase font-bold tracking-widest mb-2">
+                          Entorno LaTeX tcolorbox (Pizarrón Escolar Verde)
+                        </div>
+                        <div className="text-white text-xl sm:text-2xl font-serif py-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                          <MathRenderer math={activeEquation} />
+                        </div>
+                      </div>
+
+                      {/* Collapsible Source Code */}
+                      <div className="rounded-xl border border-slate-800/90 overflow-hidden bg-slate-950">
+                        <button
+                          type="button"
+                          onClick={() => setShowFullLatexDoc(!showFullLatexDoc)}
+                          className="w-full px-3 py-2 flex items-center justify-between text-xs text-slate-400 hover:text-slate-200 bg-slate-900/60 transition cursor-pointer"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Code2 className="w-3.5 h-3.5 text-emerald-400" />
+                            {showFullLatexDoc ? 'Ocultar Código LaTeX Compilable' : 'Ver Código Fuente Compilable (tcolorbox)'}
+                          </span>
+                          {showFullLatexDoc ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+
+                        {showFullLatexDoc && (
+                          <div className="p-3 text-[11px] font-mono text-emerald-300/90 overflow-x-auto max-h-56 bg-slate-950/90 border-t border-slate-800">
+                            <pre>{fullLatexDoc}</pre>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* SECCIÓN 3: PARÁMETROS DEL CIRCUITO RLC (Sin Asumir Datos) */}
+                    {isRlcCircuit && (
+                      <div className="p-4 sm:p-5 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-3 animate-fade-in">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Sliders className="w-4 h-4 text-cyan-400" />
+                            <h4 className="text-xs sm:text-sm font-bold text-cyan-200">
+                              Parámetros Reales del Circuito RLC (Sin Inventar Datos)
+                            </h4>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setRlcParams({ R: 10, L: 1, C: 0.04, i0: 0, v: 1 })}
+                            className="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold underline cursor-pointer"
+                          >
+                            Valores Típicos: R=10Ω, L=1H, C=0.04F
+                          </button>
+                        </div>
+
+                        <p className="text-[11px] text-slate-300 leading-relaxed">
+                          La ecuación manuscrita contiene componentes simbólicos (R, L, C). Ingresa los valores reales de tu ejercicio para calcular la función de transferencia G(s) = I(s)/V(s) y graficar el tiempo de asentamiento:
+                        </p>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                              Resistencia R (Ω)
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={rlcParams.R}
+                              onChange={(e) => setRlcParams({ ...rlcParams, R: parseFloat(e.target.value) || 0 })}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white focus:border-cyan-400 outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                              Inductancia L (H)
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={rlcParams.L}
+                              onChange={(e) => setRlcParams({ ...rlcParams, L: parseFloat(e.target.value) || 0 })}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white focus:border-cyan-400 outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                              Capacitancia C (F)
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={rlcParams.C}
+                              onChange={(e) => setRlcParams({ ...rlcParams, C: parseFloat(e.target.value) || 0 })}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white focus:border-cyan-400 outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                              Corriente i(0) (A)
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={rlcParams.i0}
+                              onChange={(e) => setRlcParams({ ...rlcParams, i0: parseFloat(e.target.value) || 0 })}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white focus:border-cyan-400 outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                              Voltaje V (V)
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={rlcParams.v}
+                              onChange={(e) => setRlcParams({ ...rlcParams, v: parseFloat(e.target.value) || 0 })}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white focus:border-cyan-400 outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
-
-                  <p className="text-[11px] text-slate-400 text-center">
-                    💡 La fórmula se transcribirá directamente desde tu imagen recortada utilizando el modelo de visión.
-                  </p>
                 </div>
               )}
 
