@@ -42,11 +42,21 @@ export async function POST(request: NextRequest) {
       const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
 
       // Required Vision Prompt
-      const visionPrompt = `Eres un asistente de élite en transcripción matemática OCR de fórmulas manuscritas en libretas y pizarrones para control y transformada de Laplace.
-Transcribe con absoluta fidelidad lo que está escrito a mano en la imagen (por ejemplo: circuitos RLC como "= L di/dt + Ri + 1/C \\int i dt", ecuaciones diferenciales como "y'' + 4y' + 13y = 0", funciones de transferencia o expresiones temporales).
+      const visionPrompt = `Eres un sistema experto en visión por computadora y OCR matemático especializado en transcribir ecuaciones manuscritas en notación LaTeX.
+Sigue estrictamente este procedimiento de interpretación visual:
+1. FILTRADO DE FONDO:
+   - Ignora por completo las líneas horizontales o cuadrículas del cuaderno, manchas y sombras.
+   - Concéntrate exclusivamente en los trazos de tinta o lápiz.
+2. ANÁLISIS CONTEXTUAL Y DE INGENIERÍA:
+   - Identifica el dominio científico (ej. circuitos RLC con inductancia L, resistencia R y capacitancia C; ecuaciones diferenciales; control y transformada de Laplace).
+   - Utiliza el contexto para resolver ambigüedades en letras y símbolos (ejemplo: diferenciar la letra 't' del signo '+', identificar derivadas d/dt o di/dt, e interpretar correctamente funciones y subíndices como i(t)).
+3. RECONOCIMIENTO DE ESTRUCTURA:
+   - Identifica fracciones, derivadas, integrales con sus límites (ej. de 0 a t) y subíndices.
+   - Si un trazo parece borroneado o corregido sobre el papel, interpreta la intención lógica del término en la ecuación.
+
 Devuelve estrictamente un objeto JSON con:
-1. "raw_latex": La transcripción literal exacta en código LaTeX de la fórmula que ves en la imagen.
-2. "laplace_latex": La expresión en el dominio s si es posible obtenerla.
+1. "raw_latex": La transcripción literal exacta en código LaTeX de la ecuación matemática transcrita.
+2. "laplace_latex": La expresión en el dominio de frecuencia compleja s si aplica.
 3. "is_valid": true si la imagen contiene una expresión matemática legible.`;
 
       let parsedResult: { raw_latex?: string; laplace_latex?: string; is_valid?: boolean } | null = null;
