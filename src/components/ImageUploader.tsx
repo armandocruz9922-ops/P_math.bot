@@ -465,15 +465,41 @@ export const ImageUploader: React.FC = () => {
                 </div>
               )}
 
-              {/* Error Message Alert (e.g. incomplete crop or unreadable handwriting) */}
+              {/* Error Message Alert with Direct Action Buttons */}
               {errorMessage && (
-                <div className="p-4 rounded-2xl bg-rose-950/50 border border-rose-500/50 text-rose-300 flex items-start gap-3 animate-fade-in shadow-xl">
-                  <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-                  <div className="text-xs space-y-1">
-                    <p className="font-bold text-rose-200">{errorMessage}</p>
-                    <p className="text-[11px] text-slate-300">
-                      Asegúrate de que la imagen recortada contenga los trazos completos de la ecuación o ingresa tu API Key en Configuración (icono ⚙️).
-                    </p>
+                <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-500/60 text-rose-300 space-y-2.5 animate-fade-in shadow-xl">
+                  <div className="flex items-start gap-3">
+                    <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                    <div className="text-xs space-y-1">
+                      <p className="font-bold text-rose-200">{errorMessage}</p>
+                      <p className="text-[11px] text-slate-300">
+                        Puedes escribir la fórmula directamente o configurar tu API Key gratuita de Gemini:
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1 pl-8">
+                    <button
+                      type="button"
+                      onClick={() => setIsApiKeyModalOpen(true)}
+                      className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-semibold transition cursor-pointer"
+                    >
+                      Configurar API Key / Transcribir
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingLatex(true)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition cursor-pointer"
+                    >
+                      Escribir Fórmula Manualmente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsCroppingOpen(true)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs transition cursor-pointer"
+                    >
+                      Reajustar Recuadro
+                    </button>
                   </div>
                 </div>
               )}

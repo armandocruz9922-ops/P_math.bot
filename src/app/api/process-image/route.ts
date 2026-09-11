@@ -42,7 +42,12 @@ export async function POST(request: NextRequest) {
       const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
 
       // Required Vision Prompt
-      const visionPrompt = `Analiza la imagen manuscrita provista. Transcribe con total precisión el texto matemático escrito en la imagen a código LaTeX. Si la imagen contiene una función o ecuación en el dominio del tiempo f(t), transcríbela tal cual y calcula su Transformada de Laplace L{f(t)}=F(s). Retorna un objeto JSON con: 1) raw_latex (lo que dice la foto), 2) laplace_latex (la transformada obtenida en s), y 3) is_valid (booleano).`;
+      const visionPrompt = `Eres un asistente de élite en transcripción matemática OCR de fórmulas manuscritas en libretas y pizarrones para control y transformada de Laplace.
+Transcribe con absoluta fidelidad lo que está escrito a mano en la imagen (por ejemplo: circuitos RLC como "= L di/dt + Ri + 1/C \\int i dt", ecuaciones diferenciales como "y'' + 4y' + 13y = 0", funciones de transferencia o expresiones temporales).
+Devuelve estrictamente un objeto JSON con:
+1. "raw_latex": La transcripción literal exacta en código LaTeX de la fórmula que ves en la imagen.
+2. "laplace_latex": La expresión en el dominio s si es posible obtenerla.
+3. "is_valid": true si la imagen contiene una expresión matemática legible.`;
 
       let parsedResult: { raw_latex?: string; laplace_latex?: string; is_valid?: boolean } | null = null;
       const isOpenAI = effectiveKey.startsWith('sk-');
@@ -70,10 +75,30 @@ export async function POST(request: NextRequest) {
           })
         });
 
-        if (openAiRes.ok) {
-          const data = await openAiRes.json();
-          const content = data.choices?.[0]?.message?.content;
-          if (content) parsedResult = JSON.parse(content);
+        if (!openAiRes.ok) {
+          const errText = await openAiRes.text();
+          console.error('Error de OpenAI API:', openAiRes.status, errText);
+          let userMsg = 'Error al comunicarse con la API de OpenAI.';
+          try {
+            const errObj = JSON.parse(errText);
+            if (errObj.error?.message) {
+              userMsg = `Error de OpenAI API (${openAiRes.status}): ${errObj.error.message}`;
+            }
+          } catch (e) {}
+          return NextResponse.json(
+            { success: false, status: 'ERROR', error: userMsg },
+            { status: 400 }
+          );
+        }
+
+        const data = await openAiRes.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) {
+          try {
+            parsedResult = JSON.parse(content);
+          } catch (e) {
+            parsedResult = { raw_latex: content.replace(/```json|```/g, '').trim(), is_valid: true };
+          }
         }
       } else {
         const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${effectiveKey}`;
@@ -93,26 +118,56 @@ export async function POST(request: NextRequest) {
           })
         });
 
-        if (geminiRes.ok) {
-          const data = await geminiRes.json();
-          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (rawText) parsedResult = JSON.parse(rawText);
+        if (!geminiRes.ok) {
+          const errText = await geminiRes.text();
+          console.error('Error de Gemini API:', geminiRes.status, errText);
+          let userMsg = 'Error al comunicarse con la API de Google Gemini.';
+          try {
+            const errObj = JSON.parse(errText);
+            if (errObj.error?.message) {
+              userMsg = `Error de Gemini API (${geminiRes.status}): ${errObj.error.message}`;
+            }
+          } catch (e) {}
+
+          return NextResponse.json(
+            { success: false, status: 'ERROR', error: userMsg },
+            { status: 400 }
+          );
+        }
+
+        const data = await geminiRes.json();
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (rawText) {
+          try {
+            const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+            parsedResult = JSON.parse(cleanJson);
+          } catch (jsonErr) {
+            console.warn('Fallback extrayendo LaTeX del texto de Gemini:', rawText);
+            parsedResult = {
+              raw_latex: rawText.replace(/```latex|```/g, '').trim(),
+              is_valid: true
+            };
+          }
         }
       }
 
-      // Check if image is valid or unreadable
-      if (!parsedResult || !parsedResult.is_valid || (!parsedResult.raw_latex && !parsedResult.laplace_latex)) {
+      // Check if image produced any recognizable text
+      if (!parsedResult || (!parsedResult.raw_latex && !parsedResult.laplace_latex)) {
         return NextResponse.json(
           { 
             success: false, 
             status: 'ERROR',
-            error: 'No se pudo interpretar la fórmula en la imagen recortada. Por favor reajusta el recuadro' 
+            error: 'No se pudo reconocer una expresión matemática en la imagen. Por favor reajusta el recuadro sobre los trazos de la fórmula.' 
           },
           { status: 400 }
         );
       }
 
-      rawLatex = parsedResult.raw_latex?.trim() || '';
+      rawLatex = (parsedResult.raw_latex || parsedResult.laplace_latex || '').trim();
+      // If starts with = prefix with v(t)
+      if (rawLatex.startsWith('=')) {
+        rawLatex = 'v(t) ' + rawLatex;
+      }
       laplaceLatex = parsedResult.laplace_latex?.trim() || rawLatex;
     }
 
