@@ -1,6 +1,15 @@
-import { EquationSolution, ProcessingPhase, CalculationMode } from './types';
+import { EquationSolution, ProcessingPhase, CalculationMode, NeedsInputData } from './types';
 import { getSampleSolution } from './sample-equations';
 import { parseAndSolveLaplace, validateLaplaceDomain } from './laplace-solver';
+
+export class NeedsInputError extends Error {
+  data: NeedsInputData;
+  constructor(data: NeedsInputData) {
+    super(data.message || 'Se requieren parámetros adicionales');
+    this.name = 'NeedsInputError';
+    this.data = data;
+  }
+}
 
 export interface SolveOptions {
   imageBase64?: string;
@@ -8,11 +17,22 @@ export interface SolveOptions {
   manualLatex?: string;
   calculationMode?: CalculationMode;
   userApiKey?: string;
+  userParameters?: Record<string, number>;
+  rawLatexOverride?: string;
   onPhaseChange?: (phase: ProcessingPhase, percent: number) => void;
 }
 
 export async function processChalkboardImage(options: SolveOptions): Promise<EquationSolution> {
-  const { imageBase64, sampleId, manualLatex, calculationMode, userApiKey, onPhaseChange } = options;
+  const { 
+    imageBase64, 
+    sampleId, 
+    manualLatex, 
+    calculationMode, 
+    userApiKey, 
+    userParameters, 
+    rawLatexOverride,
+    onPhaseChange 
+  } = options;
 
   // Phase 1: Uploading / Reading input
   onPhaseChange?.('uploading', 15);
@@ -74,11 +94,23 @@ export async function processChalkboardImage(options: SolveOptions): Promise<Equ
         body: JSON.stringify({
           imageBase64,
           userApiKey,
-          calculationMode
+          calculationMode,
+          userParameters,
+          rawLatexOverride
         })
       });
 
       const data = await res.json();
+
+      // Check if server detected missing parameters and requests user input
+      if (data.status === 'NEEDS_INPUT') {
+        throw new NeedsInputError({
+          raw_latex: data.raw_latex,
+          detected_formula: data.detected_formula || data.raw_latex,
+          missing_parameters: data.missing_parameters || [],
+          message: data.message || 'Se requieren parámetros adicionales'
+        });
+      }
 
       if (res.ok && data.success && data.solution) {
         onPhaseChange?.('verifying_proof', 95);
@@ -90,6 +122,9 @@ export async function processChalkboardImage(options: SolveOptions): Promise<Equ
         throw new Error(errorMsg);
       }
     } catch (err: unknown) {
+      if (err instanceof NeedsInputError) {
+        throw err;
+      }
       const msg = err instanceof Error ? err.message : 'No se pudo interpretar la fórmula en la imagen recortada. Por favor reajusta el recuadro';
       throw new Error(msg);
     }

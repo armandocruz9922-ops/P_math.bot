@@ -1,8 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { EquationSolution, ProcessingPhase, HistoryEntry, EquationStep, CalculationMode } from '@/lib/types';
-import { processChalkboardImage } from '@/lib/ocr-solver-service';
+import { EquationSolution, ProcessingPhase, HistoryEntry, EquationStep, CalculationMode, NeedsInputData } from '@/lib/types';
+import { processChalkboardImage, NeedsInputError } from '@/lib/ocr-solver-service';
 import { useRouter } from 'next/navigation';
 
 interface EquationContextType {
@@ -17,6 +17,9 @@ interface EquationContextType {
   history: HistoryEntry[];
   isHistoryOpen: boolean;
   explainingStep: EquationStep | null;
+  needsInputData: NeedsInputData | null;
+  setNeedsInputData: (data: NeedsInputData | null) => void;
+  submitUserParameters: (parameters: Record<string, number>) => Promise<boolean>;
   setCalculationMode: (mode: CalculationMode) => void;
   setUserApiKey: (key: string) => void;
   setCurrentImage: (image: string | null) => void;
@@ -29,7 +32,9 @@ interface EquationContextType {
     sampleId?: string, 
     manualLatex?: string, 
     croppedData?: string, 
-    modeOverride?: CalculationMode
+    modeOverride?: CalculationMode,
+    userParameters?: Record<string, number>,
+    rawLatexOverride?: string
   ) => Promise<boolean>;
   loadHistoryEntry: (entry: HistoryEntry) => void;
   clearHistory: () => void;
@@ -57,6 +62,7 @@ export function EquationProvider({ children }: { children: ReactNode }) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [explainingStep, setExplainingStep] = useState<EquationStep | null>(null);
+  const [needsInputData, setNeedsInputData] = useState<NeedsInputData | null>(null);
 
   const router = useRouter();
 
@@ -169,7 +175,9 @@ export function EquationProvider({ children }: { children: ReactNode }) {
     sampleId?: string,
     manualLatex?: string,
     croppedData?: string,
-    modeOverride?: CalculationMode
+    modeOverride?: CalculationMode,
+    userParameters?: Record<string, number>,
+    rawLatexOverride?: string
   ): Promise<boolean> => {
     setIsProcessing(true);
     setProcessingPhase('uploading');
@@ -185,6 +193,8 @@ export function EquationProvider({ children }: { children: ReactNode }) {
         manualLatex,
         calculationMode: activeMode,
         userApiKey: userApiKey.trim() || undefined,
+        userParameters,
+        rawLatexOverride,
         onPhaseChange: (phase, percent) => {
           setProcessingPhase(phase);
           setProcessingPercent(percent);
@@ -217,6 +227,7 @@ export function EquationProvider({ children }: { children: ReactNode }) {
         console.warn('No se pudo persistir en sessionStorage:', e);
       }
 
+      setNeedsInputData(null);
       await new Promise((r) => setTimeout(r, 300));
       setIsProcessing(false);
       setProcessingPhase('idle');
@@ -225,6 +236,14 @@ export function EquationProvider({ children }: { children: ReactNode }) {
       router.push('/resultado');
       return true;
     } catch (error) {
+      if (error instanceof NeedsInputError) {
+        setNeedsInputData(error.data);
+        setIsProcessing(false);
+        setProcessingPhase('needs_input');
+        setProcessingPercent(0);
+        return false;
+      }
+
       console.error('Error al resolver la transformada de Laplace:', error);
       setIsProcessing(false);
       setProcessingPhase('error');
@@ -233,10 +252,24 @@ export function EquationProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const submitUserParameters = async (params: Record<string, number>): Promise<boolean> => {
+    const rawLatex = needsInputData?.raw_latex;
+    return await solveEquation(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      params,
+      rawLatex
+    );
+  };
+
   const resetState = () => {
     setCurrentImage(null);
     setCroppedImage(null);
     setCurrentSolution(null);
+    setNeedsInputData(null);
     setIsProcessing(false);
     setProcessingPhase('idle');
     setProcessingPercent(0);
@@ -263,6 +296,9 @@ export function EquationProvider({ children }: { children: ReactNode }) {
         history,
         isHistoryOpen,
         explainingStep,
+        needsInputData,
+        setNeedsInputData,
+        submitUserParameters,
         setCalculationMode: handleSetCalculationMode,
         setUserApiKey: saveApiKey,
         setCurrentImage,

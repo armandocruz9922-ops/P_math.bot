@@ -88,7 +88,13 @@ Debes responder ÚNICAMENTE con un objeto JSON válido (sin markdown exterior) c
           const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
           if (rawText) {
             const parsed = JSON.parse(rawText);
-            const detected = parsed.detectedLatex || 'G(s) = \\frac{25}{s^2 + 4s + 25}';
+            const detected = parsed.detectedLatex?.trim();
+            if (!detected) {
+              return NextResponse.json(
+                { success: false, error: 'No se pudo interpretar la fórmula en la imagen recortada. Por favor reajusta el recuadro' },
+                { status: 400 }
+              );
+            }
             const domain = validateLaplaceDomain(detected);
 
             const solution = parseAndSolveLaplace(

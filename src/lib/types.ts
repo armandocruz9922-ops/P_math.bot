@@ -184,12 +184,30 @@ export interface HistoryEntry {
   solution: EquationSolution;
 }
 
+export interface MissingParameter {
+  key: string;            // e.g. "y0", "yPrime0", "k", "omega"
+  label: string;          // e.g. "Condición inicial y(0)"
+  symbol: string;         // e.g. "y(0)"
+  placeholder: string;    // e.g. "0"
+  type: 'number' | 'text';
+  required: boolean;
+  description?: string;
+}
+
+export interface NeedsInputData {
+  raw_latex: string;
+  detected_formula: string;
+  missing_parameters: MissingParameter[];
+  message: string;
+}
+
 export type ProcessingPhase = 
   | 'idle'
   | 'uploading'
   | 'scanning_board'
   | 'extracting_ocr'
   | 'validating_domain'
+  | 'needs_input'
   | 'solving_math'
   | 'verifying_proof'
   | 'completed'

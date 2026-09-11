@@ -8,6 +8,7 @@ import { CameraCaptureModal } from './CameraCaptureModal';
 import { ProcessingOverlay } from './ProcessingOverlay';
 import { LaplaceCropper } from './LaplaceCropper';
 import { LatexEditor } from './LatexEditor';
+import { DataInputModal } from './DataInputModal';
 import { CalculationMode } from '@/lib/types';
 import { validateLaplaceDomain } from '@/lib/laplace-solver';
 import { 
@@ -39,7 +40,10 @@ export const ImageUploader: React.FC = () => {
     solveEquation, 
     isProcessing, 
     processingPhase, 
-    processingPercent 
+    processingPercent,
+    needsInputData,
+    setNeedsInputData,
+    submitUserParameters
   } = useEquation();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -535,6 +539,17 @@ export const ImageUploader: React.FC = () => {
       {isProcessing && (
         <ProcessingOverlay phase={processingPhase} percent={processingPercent} />
       )}
+
+      {/* Pop-up Modal for Missing Data / Initial Conditions (Zero Assumptions) */}
+      <DataInputModal
+        isOpen={Boolean(needsInputData)}
+        needsInputData={needsInputData}
+        onSubmit={async (parameters) => {
+          await submitUserParameters(parameters);
+        }}
+        onCancel={() => setNeedsInputData(null)}
+        isSubmitting={isProcessing}
+      />
     </>
   );
 };

@@ -877,6 +877,146 @@ export function solveDirectLaplace(
   };
 }
 
+export interface ExtractedTF {
+  num: number;
+  a2: number;
+  a1: number;
+  a0: number;
+}
+
+export function parseSecondOrderPoly(polyStr: string): { a2: number; a1: number; a0: number } | null {
+  const clean = polyStr
+    .replace(/\s+/g, '')
+    .replace(/\{|\}/g, '')
+    .replace(/\\left|\\right/g, '');
+
+  let a2 = 0;
+  let a1 = 0;
+  let a0 = 0;
+  let foundA2 = false;
+
+  // s^2 term
+  const s2Match = clean.match(/([+-]?\d*(?:\.\d+)?)s\^?2/);
+  if (s2Match) {
+    foundA2 = true;
+    const raw = s2Match[1];
+    a2 = raw === '' || raw === '+' ? 1 : raw === '-' ? -1 : parseFloat(raw);
+  }
+
+  // s^1 term (not s^2)
+  const s1Match = clean.match(/([+-]?\d*(?:\.\d+)?)s(?!\^|\d)/);
+  if (s1Match) {
+    const raw = s1Match[1];
+    a1 = raw === '' || raw === '+' ? 1 : raw === '-' ? -1 : parseFloat(raw);
+  }
+
+  // Constant term: strip s^2 and s terms and parse leftover number
+  let remaining = clean;
+  if (s2Match) {
+    remaining = remaining.replace(s2Match[0], '');
+  }
+  if (s1Match) {
+    remaining = remaining.replace(s1Match[0], '');
+  }
+
+  const constMatch = remaining.match(/^[+-]?\d+(?:\.\d+)?$/);
+  if (constMatch) {
+    a0 = parseFloat(constMatch[0]);
+  }
+
+  if (foundA2 && !isNaN(a2) && a2 !== 0 && !isNaN(a1) && !isNaN(a0)) {
+    return { a2, a1, a0 };
+  }
+
+  return null;
+}
+
+export function extractTransferFunctionCoefficients(latex: string): ExtractedTF | null {
+  const clean = latex
+    .replace(/\\left|\\right|\\displaystyle|\\limits/g, '')
+    .replace(/\\cdot/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Strip anything after comma or \quad (e.g. initial conditions)
+  const mainPart = clean.split(/,|\\quad/)[0].trim();
+
+  // Differential equation: y'' + 4y' + 25y = 25 or d^2y/dt^2
+  if (mainPart.includes("y''") || mainPart.includes("y'") || mainPart.includes('\\ddot') || mainPart.includes('\\dot') || mainPart.includes('d^2')) {
+    const eqParts = mainPart.split('=');
+    const lhs = eqParts[0].trim();
+    const rhs = eqParts[1]?.trim() || '';
+
+    let a2 = 1, a1 = 0, a0 = 0;
+
+    const y2 = lhs.match(/([+-]?\s*\d*(?:\.\d+)?)\s*(?:y''|\\ddot\{?y\}?|\\frac\{d\^2y\}\{dt\^2\}|\\frac\{d\^2\}\{dt\^2\}y)/);
+    if (y2) {
+      const raw = y2[1].replace(/\s+/g, '');
+      a2 = raw === '' || raw === '+' ? 1 : raw === '-' ? -1 : parseFloat(raw);
+    }
+
+    const y1 = lhs.match(/([+-]?\s*\d*(?:\.\d+)?)\s*(?:y'|\\dot\{?y\}?|\\frac\{dy\}\{dt\}|\\frac\{d\}\{dt\}y)(?!')/);
+    if (y1) {
+      const raw = y1[1].replace(/\s+/g, '');
+      a1 = raw === '' || raw === '+' ? 1 : raw === '-' ? -1 : parseFloat(raw);
+    }
+
+    const y0 = lhs.match(/([+-]?\s*\d*(?:\.\d+)?)\s*y(?![a-zA-Z'\^])/);
+    if (y0) {
+      const raw = y0[1].replace(/\s+/g, '');
+      a0 = raw === '' || raw === '+' ? 1 : raw === '-' ? -1 : parseFloat(raw);
+    }
+
+    let num = 1;
+    if (rhs) {
+      const rhsNum = parseFloat(rhs.replace(/[^\d.-]/g, ''));
+      if (!isNaN(rhsNum) && rhsNum !== 0) num = rhsNum;
+    }
+
+    if (a2 !== 0 && (a1 !== 0 || a0 !== 0)) {
+      return { num, a2, a1, a0 };
+    }
+  }
+
+  // Fraction \frac{num}{den}
+  const fracMatch = mainPart.match(/\\frac\s*\{([^}]+)\}\s*\{([^}]+)\}/);
+  if (fracMatch) {
+    const numStr = fracMatch[1].trim();
+    const denStr = fracMatch[2].trim();
+
+    const numParsed = parseFloat(numStr.replace(/[^\d.-]/g, ''));
+    const num = isNaN(numParsed) ? 1 : numParsed;
+
+    const poly = parseSecondOrderPoly(denStr);
+    if (poly) {
+      return { num, ...poly };
+    }
+  }
+
+  // Slash division e.g. 25 / (s^2 + 4s + 25)
+  if (mainPart.includes('/')) {
+    const slashParts = mainPart.split('/');
+    const numStr = slashParts[0].replace(/G\(s\)\s*=|Y\(s\)\s*=/i, '').replace(/[()]/g, '').trim();
+    const denStr = slashParts[1].replace(/[()]/g, '').trim();
+
+    const numParsed = parseFloat(numStr.replace(/[^\d.-]/g, ''));
+    const num = isNaN(numParsed) ? 1 : numParsed;
+
+    const poly = parseSecondOrderPoly(denStr);
+    if (poly) {
+      return { num, ...poly };
+    }
+  }
+
+  // Direct polynomial s^2 + 4s + 25
+  const directPoly = parseSecondOrderPoly(mainPart);
+  if (directPoly) {
+    return { num: directPoly.a0 || 1, ...directPoly };
+  }
+
+  return null;
+}
+
 // =========================================================================
 // 5. PARSER AND DISPATCHER FOR ANY LATEX STRING
 // =========================================================================
@@ -910,24 +1050,25 @@ export function parseAndSolveLaplace(
     return solveDirectLaplace(inputLatex, imageSrc, sourceType);
   }
 
-  // Route 3: Transfer Function & Control Stability
-  // Check for specific preset coefficients or patterns
-  if (clean.includes('s^2') && (clean.includes('-') && clean.includes('10'))) {
-    // Unstable preset: G(s) = 10 / (s^2 - 2s + 10)
-    return solveTransferFunction(10, 1, -2, 10, imageSrc, sourceType, 'G(s) = \\frac{10}{s^2 - 2s + 10}');
+  // Route 3: Dynamic Transfer Function & Control Stability (Strictly extracted from OCR, ZERO mocks)
+  const extracted = extractTransferFunctionCoefficients(inputLatex);
+  if (extracted) {
+    const signA1 = extracted.a1 >= 0 ? `+ ${extracted.a1}` : `- ${Math.abs(extracted.a1)}`;
+    const signA0 = extracted.a0 >= 0 ? `+ ${extracted.a0}` : `- ${Math.abs(extracted.a0)}`;
+    const a2Str = extracted.a2 === 1 ? '' : extracted.a2 === -1 ? '-' : `${extracted.a2}`;
+    const customLatex = `G(s) = \\frac{${extracted.num}}{${a2Str}s^2 ${signA1}s ${signA0}}`;
+
+    return solveTransferFunction(
+      extracted.num,
+      extracted.a2,
+      extracted.a1,
+      extracted.a0,
+      imageSrc,
+      sourceType,
+      customLatex
+    );
   }
 
-  if (clean.includes('s^2') && clean.includes('+ 9') && !clean.includes('s +')) {
-    // Marginally stable preset: G(s) = 9 / (s^2 + 9)
-    return solveTransferFunction(9, 1, 0, 9, imageSrc, sourceType, 'G(s) = \\frac{9}{s^2 + 9}');
-  }
-
-  if (clean.includes('16') || clean.includes('4s')) {
-    // G(s) = 16 / (s^2 + 4s + 16)
-    return solveTransferFunction(16, 1, 4, 16, imageSrc, sourceType, 'G(s) = \\frac{16}{s^2 + 4s + 16}');
-  }
-
-  // Default standard 2nd order underdamped system G(s) = 25 / (s^2 + 4s + 25)
-  // wn = 5, zeta = 0.4 -> ts(2%) = 4/(0.4*5) = 2.0s, Mp = 25.4%
-  return solveTransferFunction(25, 1, 4, 25, imageSrc, sourceType, 'G(s) = \\frac{25}{s^2 + 4s + 25}');
+  // If coefficients could not be extracted, throw error (never assume 25, 1, 4, 25)
+  throw new Error(`No se pudieron extraer los coeficientes de la ecuación "${inputLatex}". Por favor verifica que la imagen contenga la fórmula completa.`);
 }

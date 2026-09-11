@@ -18,6 +18,7 @@ const PHASE_DETAILS: Record<ProcessingPhase, { title: string; subtitle: string; 
   solving_math: { title: 'Calculando solución simbólica...', subtitle: 'Aplicando propiedades algebraicas y deducción paso a paso', icon: '🧠' },
   verifying_proof: { title: 'Verificando demostración formal...', subtitle: 'Comprobando igualdad por sustitución (LHS = RHS)', icon: '✨' },
   completed: { title: '¡Ecuación resuelta!', subtitle: 'Cargando desglose pedagógico', icon: '🎉' },
+  needs_input: { title: 'Esperando parámetros...', subtitle: 'Ingresa los datos requeridos en el formulario', icon: '📝' },
   error: { title: 'Error en el procesamiento', subtitle: 'Por favor, intenta nuevamente', icon: '⚠️' }
 };
 
