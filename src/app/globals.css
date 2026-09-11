@@ -1,0 +1,119 @@
+@import "tailwindcss";
+@import "katex/dist/katex.min.css";
+
+:root {
+  --background: #090d16;
+  --foreground: #f1f5f9;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom Chalkboard Grid and Ambient Effects */
+.bg-chalk-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+/* Scanning animation for loading overlay */
+@keyframes scan {
+  0% {
+    top: 0%;
+    opacity: 0.2;
+  }
+  50% {
+    top: 50%;
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0.2;
+  }
+}
+
+/* Glow effects */
+.glow-emerald {
+  box-shadow: 0 0 35px -5px rgba(16, 185, 129, 0.25);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 35px -5px rgba(6, 182, 212, 0.25);
+}
+
+/* KaTeX custom overrides for dark mode clarity */
+.katex-display {
+  margin: 0.5em 0 !important;
+  color: #f8fafc !important;
+}
+
+.katex {
+  font-size: 1.25em !important;
+  color: inherit !important;
+}
+
+.katex .mord {
+  color: #f1f5f9;
+}
+
+.katex .mbin, .katex .mrel {
+  color: #38bdf8;
+}
+
+.katex .mfrac .vlist-t .vlist-r {
+  color: #34d399;
+}
+
+/* Print Styles for Exporting to Clean Academic PDF */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    background-image: none !important;
+  }
+
+  header, footer, nav, button, .print\:hidden {
+    display: none !important;
+  }
+
+  .rounded-3xl, .rounded-2xl, .rounded-xl {
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+  }
+
+  .text-white {
+    color: #0f172a !important;
+  }
+
+  .text-slate-300, .text-slate-400 {
+    color: #334155 !important;
+  }
+
+  .katex {
+    color: #0f172a !important;
+  }
+
+  .katex .mord, .katex .mbin, .katex .mrel {
+    color: #0f172a !important;
+  }
+
+  svg text {
+    fill: #0f172a !important;
+  }
+
+  svg line[stroke="#1e293b"] {
+    stroke: #e2e8f0 !important;
+  }
+
+  svg line[stroke="#475569"] {
+    stroke: #334155 !important;
+  }
+}
+

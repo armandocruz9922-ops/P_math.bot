@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="frameGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4a3020"/>
+      <stop offset="100%" stop-color="#24140a"/>
+    </linearGradient>
+    <linearGradient id="boardGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1b2838"/>
+      <stop offset="50%" stop-color="#162230"/>
+      <stop offset="100%" stop-color="#0f1722"/>
+    </linearGradient>
+    <filter id="chalkGlow2">
+      <feGaussianBlur stdDeviation="0.6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Wooden Frame -->
+  <rect x="0" y="0" width="800" height="500" rx="14" fill="url(#frameGrad2)" stroke="#130a05" stroke-width="4"/>
+  <rect x="14" y="14" width="772" height="472" rx="6" fill="#1b1008"/>
+
+  <!-- Dark Charcoal Slate Board -->
+  <rect x="22" y="22" width="756" height="456" rx="4" fill="url(#boardGrad2)"/>
+
+  <!-- Chalk Dust Smudges -->
+  <circle cx="380" cy="230" r="160" fill="#ffffff" opacity="0.025"/>
+  <circle cx="580" cy="270" r="120" fill="#ffffff" opacity="0.02"/>
+
+  <!-- Header -->
+  <text x="50" y="70" font-family="'Courier New', monospace, sans-serif" font-size="20" fill="#93c5fd" opacity="0.75">
+    Matemáticas I • Despeje de Incógnita
+  </text>
+  <line x1="50" y1="80" x2="380" y2="80" stroke="#93c5fd" stroke-width="2" opacity="0.5" stroke-dasharray="4,2"/>
+
+  <!-- Main Handwritten Equation: 3x - 7 = 14 -->
+  <g filter="url(#chalkGlow2)" transform="translate(170, 270)">
+    <!-- 3 -->
+    <text x="0" y="0" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="110" font-weight="bold" fill="#ffffff" opacity="0.95">3</text>
+    <!-- x -->
+    <text x="70" y="0" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="110" font-style="italic" fill="#ffffff" opacity="0.95">x</text>
+    <!-- - -->
+    <text x="145" y="-10" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="110" fill="#fde047" opacity="0.92">−</text>
+    <!-- 7 -->
+    <text x="210" y="0" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="110" font-weight="bold" fill="#ffffff" opacity="0.95">7</text>
+    <!-- = -->
+    <text x="290" y="-5" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="100" fill="#38bdf8" opacity="0.92">=</text>
+    <!-- 14 -->
+    <text x="375" y="0" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="110" font-weight="bold" fill="#ffffff" opacity="0.95">14</text>
+  </g>
+
+  <text x="50" y="420" font-family="'Courier New', monospace, sans-serif" font-size="17" fill="#94a3b8" opacity="0.6">
+    // Despejar x: sumar 7 a ambos lados y dividir entre 3
+  </text>
+</svg>

@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <!-- Frame Wood Gradient -->
+    <linearGradient id="frameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5a3d28"/>
+      <stop offset="50%" stop-color="#3b2314"/>
+      <stop offset="100%" stop-color="#2a180c"/>
+    </linearGradient>
+
+    <!-- Chalkboard Green Slate Gradient -->
+    <linearGradient id="boardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#142c1e"/>
+      <stop offset="40%" stop-color="#193826"/>
+      <stop offset="70%" stop-color="#163222"/>
+      <stop offset="100%" stop-color="#0f2217"/>
+    </linearGradient>
+
+    <!-- Chalk texture filter -->
+    <filter id="chalkNoise" x="0%" y="0%" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" result="noise"/>
+      <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.12 0" result="coloredNoise"/>
+      <feComposite in="SourceGraphic" in2="coloredNoise" operator="over"/>
+    </filter>
+
+    <filter id="chalkGlow">
+      <feGaussianBlur stdDeviation="0.6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Wooden Outer Frame -->
+  <rect x="0" y="0" width="800" height="500" rx="14" fill="url(#frameGrad)" stroke="#1a0e07" stroke-width="4"/>
+  <rect x="14" y="14" width="772" height="472" rx="6" fill="#1b1008"/>
+
+  <!-- Green Chalkboard Slate Inner Area -->
+  <rect x="22" y="22" width="756" height="456" rx="4" fill="url(#boardGrad)"/>
+
+  <!-- Chalk Dust Smudges -->
+  <ellipse cx="400" cy="250" rx="340" ry="180" fill="#ffffff" opacity="0.03" filter="url(#chalkNoise)"/>
+  <ellipse cx="260" cy="200" rx="180" ry="90" fill="#ffffff" opacity="0.02"/>
+  <ellipse cx="560" cy="310" rx="140" ry="70" fill="#ffffff" opacity="0.025"/>
+
+  <!-- Header chalk annotation -->
+  <text x="50" y="68" font-family="'Courier New', monospace, sans-serif" font-size="20" fill="#a7f3d0" opacity="0.75" letter-spacing="1.5">
+    Álgebra II • Ejercicio en clase
+  </text>
+  <line x1="50" y1="78" x2="330" y2="78" stroke="#a7f3d0" stroke-width="2" opacity="0.5" stroke-dasharray="4,2"/>
+
+  <!-- Main Handwritten Equation: 2x² + 5x - 3 = 0 -->
+  <g filter="url(#chalkGlow)" transform="translate(130, 260)">
+    <!-- 2 -->
+    <text x="0" y="0" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="105" font-weight="bold" fill="#ffffff" opacity="0.94">2</text>
+    <!-- x -->
+    <text x="65" y="0" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="105" font-style="italic" fill="#ffffff" opacity="0.95">x</text>
+    <!-- 2 (exponent) -->
+    <text x="130" y="-48" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="62" font-weight="bold" fill="#ffffff" opacity="0.92">2</text>
+    
+    <!-- + -->
+    <text x="185" y="-5" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="95" fill="#fde047" opacity="0.92">+</text>
+    <!-- 5 -->
+    <text x="260" y="0" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="105" font-weight="bold" fill="#ffffff" opacity="0.94">5</text>
+    <!-- x -->
+    <text x="325" y="0" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="105" font-style="italic" fill="#ffffff" opacity="0.95">x</text>
+
+    <!-- - -->
+    <text x="395" y="-10" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="105" fill="#fde047" opacity="0.92">−</text>
+    <!-- 3 -->
+    <text x="450" y="0" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="105" font-weight="bold" fill="#ffffff" opacity="0.94">3</text>
+
+    <!-- = -->
+    <text x="525" y="-5" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="95" fill="#38bdf8" opacity="0.92">=</text>
+    <!-- 0 -->
+    <text x="595" y="0" font-family="'Comic Sans MS', 'Chalkboard SE', 'Caveat', cursive, sans-serif" font-size="105" font-weight="bold" fill="#ffffff" opacity="0.95">0</text>
+  </g>
+
+  <!-- Bottom chalkboard notes -->
+  <text x="50" y="420" font-family="'Courier New', monospace, sans-serif" font-size="17" fill="#cbd5e1" opacity="0.6">
+    // Resolver por fórmula cuadrática o factorización: a=2, b=5, c=-3
+  </text>
+
+  <!-- Chalk Pieces in Tray -->
+  <rect x="620" y="468" width="55" height="12" rx="3" fill="#f8fafc" opacity="0.9"/>
+  <rect x="685" y="469" width="45" height="11" rx="3" fill="#fef08a" opacity="0.85"/>
+</svg>
