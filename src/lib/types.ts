@@ -37,14 +37,14 @@ export interface GraphKeyPoint {
   label: string;
   x: number;
   y: number;
-  type: 'root' | 'vertex' | 'intercept' | 'intersection';
+  type: 'root' | 'vertex' | 'intercept' | 'intersection' | 'settling' | 'peak';
   color: string;
   description: string;
 }
 
 export interface GraphConfig {
-  type: 'quadratic' | 'linear' | 'system' | 'custom';
-  functionExpression: string; // e.g. "f(x) = 2x^2 + 5x - 3"
+  type: 'quadratic' | 'linear' | 'system' | 'laplace_response' | 'custom';
+  functionExpression: string;
   latexExpression: string;
   a?: number;
   b?: number;
@@ -58,16 +58,105 @@ export interface GraphConfig {
   evaluateAt?: (x: number) => number;
 }
 
+// -------------------------------------------------------------
+// Specialized Laplace & Control Theory Types
+// -------------------------------------------------------------
+
+export type CalculationMode = 
+  | 'direct'            // L{f(t)} -> F(s)
+  | 'inverse'           // L^-1{F(s)} -> f(t)
+  | 'transfer_function'; // G(s) Step Response & Stability Analysis
+
+export type StabilityStatus = 
+  | 'stable'    // All poles in strict Left-Half Plane (Re < 0)
+  | 'marginal'  // Simple non-repeated poles on imaginary axis (Re = 0)
+  | 'unstable'; // Any pole in Right-Half Plane (Re > 0) or multiple on Re = 0
+
+export interface PoleZero {
+  real: number;
+  imag: number;
+  type: 'pole' | 'zero';
+  label: string;
+  latex: string;
+}
+
+export interface ControlMetrics {
+  settlingTime2Pct: number;    // ts (2% error criterion)
+  settlingTime5Pct: number;    // ts (5% error criterion)
+  riseTime: number;            // tr (rise time)
+  peakOvershootPct: number;    // Mp (percentage peak overshoot)
+  peakTime: number;            // tp (time to peak)
+  steadyStateValue: number;    // y_ss (final steady state value)
+  naturalFreq?: number;        // wn (undamped natural frequency rad/s)
+  dampingRatio?: number;       // zeta (damping ratio)
+  dampedFreq?: number;         // wd (damped natural frequency rad/s)
+}
+
+export interface TimeResponsePoint {
+  t: number;
+  y: number;
+}
+
+export interface ToleranceBand {
+  lower: number;
+  upper: number;
+  steadyState: number;
+  percentage: number; // e.g. 2 or 5
+}
+
+export interface StabilityAnalysis {
+  status: StabilityStatus;
+  statusLabel: string;
+  statusDescription: string;
+  poles: PoleZero[];
+  zeros: PoleZero[];
+  metrics: ControlMetrics;
+  timeResponseData: TimeResponsePoint[];
+  toleranceBand2Pct: ToleranceBand;
+  toleranceBand5Pct: ToleranceBand;
+  settlingPoint2Pct: { t: number; y: number };
+  peakPoint?: { t: number; y: number };
+  transferFunctionLatex: string;
+  characteristicPolynomialLatex: string;
+  stepResponseLatex: string;
+}
+
+export interface DomainValidationResult {
+  isValid: boolean;
+  detectedDomain: 'laplace_direct' | 'laplace_inverse' | 'transfer_function' | 'differential' | 'invalid';
+  message: string;
+  suggestedCategory?: CalculationMode;
+  suggestedCorrection?: string;
+}
+
+export interface AppliedProperty {
+  name: string;
+  formula: string;
+  description: string;
+}
+
+export interface PartialFractionTerm {
+  termLatex: string;
+  residue: string;
+  inverseLatex: string;
+  method: string;
+}
+
 export interface EquationSolution {
   id: string;
-  originalImage: string; // Base64 data URL or sample image path
+  originalImage: string;
   croppedImage?: string;
   detectedLatex: string;
-  confidenceScore: number; // e.g. 0.98 (98%)
-  equationType: string;    // e.g. "Ecuación Cuadrática", "Ecuación Lineal"
-  methodUsed: string;      // e.g. "Fórmula General de Bhaskara", "Despeje Algebraico"
+  confidenceScore: number;
+  equationType: string;
+  methodUsed: string;
+  calculationMode?: CalculationMode;
+  domainValidation?: DomainValidationResult;
+  appliedProperties?: AppliedProperty[];
+  partialFractions?: PartialFractionTerm[];
+  stabilityAnalysis?: StabilityAnalysis;
   steps: EquationStep[];
-  finalSolutions: string[]; // e.g. ["x_1 = \\frac{1}{2}", "x_2 = -3"]
+  finalSolutions: string[];
   verification: EquationVerification;
   graphConfig?: GraphConfig;
   sourceType: 'upload' | 'camera' | 'sample';
@@ -79,6 +168,8 @@ export interface HistoryEntry {
   timestamp: string;
   detectedLatex: string;
   equationType: string;
+  calculationMode?: CalculationMode;
+  stabilityStatus?: StabilityStatus;
   thumbnail: string;
   solutions: string[];
   solution: EquationSolution;
@@ -89,6 +180,7 @@ export type ProcessingPhase =
   | 'uploading'
   | 'scanning_board'
   | 'extracting_ocr'
+  | 'validating_domain'
   | 'solving_math'
   | 'verifying_proof'
   | 'completed'
@@ -99,7 +191,9 @@ export interface SampleBlackboard {
   title: string;
   subtitle: string;
   latex: string;
+  calculationMode: CalculationMode;
   equationType: string;
   imagePath: string;
   badge: string;
+  stabilityStatus?: StabilityStatus;
 }

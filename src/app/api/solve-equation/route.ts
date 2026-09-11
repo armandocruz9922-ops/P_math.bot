@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSampleSolution } from '@/lib/sample-equations';
-import { parseAndSolveEquation, solveRLCIntegroDifferential, solveQuadratic, solveLinear, solveFactoring, solveSystem2x2 } from '@/lib/local-solver';
+import { parseAndSolveLaplace, solveTransferFunction, validateLaplaceDomain } from '@/lib/laplace-solver';
 import { EquationSolution } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { imageBase64, sampleId, manualLatex, userApiKey } = body;
+    const { imageBase64, sampleId, manualLatex, calculationMode, userApiKey } = body;
 
-    // 1. Si es un ejemplo de pizarrón seleccionado por el usuario
+    // 1. Si es un ejemplo de pizarra de control seleccionado directamente
     if (sampleId) {
       const solution = getSampleSolution(sampleId);
       return NextResponse.json({
@@ -18,13 +18,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 2. Si el usuario editó o ingresó una fórmula LaTeX directamente
+    // 2. Si el usuario ingresó o editó una fórmula LaTeX directamente
     if (manualLatex && manualLatex.trim().length > 0) {
-      const solution = parseAndSolveEquation(
+      const domain = validateLaplaceDomain(manualLatex);
+      
+      const solution = parseAndSolveLaplace(
         manualLatex,
-        imageBase64 || '/samples/pizarron-cuadratica.svg',
+        imageBase64 || '/samples/pizarron-rlc.svg',
+        calculationMode,
         imageBase64 ? 'upload' : 'sample'
       );
+      solution.domainValidation = domain;
+
       return NextResponse.json({
         success: true,
         source: 'manual_latex_solved',
@@ -41,43 +46,16 @@ export async function POST(request: NextRequest) {
         const mimeTypeMatch = imageBase64.match(/^data:(image\/[a-zA-Z+]+);base64,/);
         const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
 
-        const prompt = `Eres un asistente de élite en OCR de fórmulas matemáticas manuscritas en pizarrón y libreta de clase (incluyendo cálculo diferencial, integrales, circuitos RLC, álgebra).
-Analiza con total fidelidad la fórmula escrita a mano en la imagen. Puede ser una ecuación íntegro-diferencial (ej: = L di(t)/dt + R i(t) + 1/C ∫ i(t) dt), una ecuación diferencial, cuadrática o lineal.
+        const prompt = `Eres un asistente de élite en OCR de fórmulas matemáticas manuscritas en pizarrón de clase y libretas universitarias especializado EXCLUSIVAMENTE en Transformadas de Laplace y Teoría de Control (G(s), F(s), f(t), polos, tiempo de asentamiento).
+Analiza con total fidelidad la fórmula escrita a mano en la imagen (ej: G(s) = 25/(s^2+4s+25), L{4e^-2t sin 3t}, L^-1{3s+5/((s+1)(s+2))}, ecuaciones diferenciales en el dominio s).
 
 Debes responder ÚNICAMENTE con un objeto JSON válido (sin markdown exterior) con la siguiente estructura:
 {
-  "detectedLatex": "LaTeX fiel de la fórmula (ej: v(t) = L \\\\frac{di(t)}{dt} + R i(t) + \\\\frac{1}{C} \\\\int_0^t i(\\\\tau) \\\\, d\\\\tau)",
-  "equationType": "Tipo de ecuación (ej: Ecuación Íntegro-Diferencial RLC, Ecuación Cuadrática, etc.)",
-  "methodUsed": "Método de resolución (ej: Derivación y Polinomio Característico de Segundo Orden, Bhaskara)",
-  "confidenceScore": 0.98,
-  "steps": [
-    {
-      "stepNumber": 1,
-      "title": "Título pedagógico del paso",
-      "description": "Explicación detallada de la operación",
-      "mathExpression": "Expresión LaTeX correspondiente a este paso",
-      "ruleApplied": "Nombre de la propiedad matemática"
-    }
-  ],
-  "finalSolutions": [
-    "s_{1,2} = -\\\\alpha \\\\pm \\\\sqrt{\\\\alpha^2 - \\\\omega_0^2}",
-    "i(t) = I_0 e^{-\\\\alpha t} \\\\sin(\\\\omega_d t)"
-  ],
-  "verification": {
-    "originalFormula": "LaTeX original",
-    "testedValues": [{"variable": "v(t)", "value": "L di/dt + Ri + 1/C ∫ i dt"}],
-    "steps": [
-      {
-        "title": "Comprobación Formal",
-        "description": "Verificación de la solución",
-        "substitutionMath": "v_L + v_R + v_C = v(t)",
-        "evaluationMath": "0 = 0 \\\\quad \\\\checkmark",
-        "isSatisfied": true
-      }
-    ],
-    "conclusion": "Demostración completada con éxito.",
-    "isValid": true
-  }
+  "detectedLatex": "LaTeX fiel de la fórmula (ej: G(s) = \\\\frac{25}{s^2 + 4s + 25})",
+  "calculationMode": "transfer_function | direct | inverse",
+  "equationType": "Tipo (ej: Función de Transferencia de Segundo Orden)",
+  "methodUsed": "Método (ej: Análisis en el Plano s y Polos Complejos)",
+  "confidenceScore": 0.98
 }`;
 
         const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${effectiveGeminiKey}`;
@@ -109,51 +87,42 @@ Debes responder ÚNICAMENTE con un objeto JSON válido (sin markdown exterior) c
           const geminiData = await geminiRes.json();
           const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
           if (rawText) {
-            const parsedSolution = JSON.parse(rawText);
-            const completeSolution: EquationSolution = {
-              id: 'sol_ai_' + Date.now(),
-              originalImage: imageBase64,
-              detectedLatex: parsedSolution.detectedLatex || 'v(t) = L \\frac{di(t)}{dt} + R i(t) + \\frac{1}{C} \\int_0^t i(\\tau) \\, d\\tau',
-              confidenceScore: parsedSolution.confidenceScore || 0.98,
-              equationType: parsedSolution.equationType || 'Ecuación Matemática Avanzada',
-              methodUsed: parsedSolution.methodUsed || 'Resolución Analítica Detallada',
-              steps: parsedSolution.steps || [],
-              finalSolutions: parsedSolution.finalSolutions || [],
-              verification: parsedSolution.verification || {
-                originalFormula: parsedSolution.detectedLatex,
-                testedValues: [],
-                steps: [],
-                conclusion: 'Verificación completada',
-                isValid: true
-              },
-              sourceType: 'upload',
-              timestamp: new Date().toISOString()
-            };
+            const parsed = JSON.parse(rawText);
+            const detected = parsed.detectedLatex || 'G(s) = \\frac{25}{s^2 + 4s + 25}';
+            const domain = validateLaplaceDomain(detected);
+
+            const solution = parseAndSolveLaplace(
+              detected,
+              imageBase64,
+              parsed.calculationMode || calculationMode,
+              'upload'
+            );
+            solution.confidenceScore = parsed.confidenceScore || 0.98;
+            solution.domainValidation = domain;
 
             return NextResponse.json({
               success: true,
               source: 'gemini_vision_ai',
-              solution: completeSolution
+              solution
             });
           }
         }
       } catch (aiError) {
-        console.warn('Fallo llamada Gemini AI, utilizando motor OCR y resolución local:', aiError);
+        console.warn('Fallo llamada Gemini AI, utilizando motor Laplace analítico local:', aiError);
       }
     }
 
-    // 4. Modo Local / Standalone Inteligente:
-    // Analiza las opciones y resuelve inmediatamente con precisión analítica
-    const rlcSolution = solveRLCIntegroDifferential(
+    // 4. Modo Local Predeterminado para Laplace
+    const laplaceSolution = solveTransferFunction(
+      25, 1, 4, 25,
       imageBase64 || '/samples/pizarron-rlc.svg',
       'upload'
     );
 
     return NextResponse.json({
       success: true,
-      source: 'integro_differential_engine',
-      solution: rlcSolution,
-      note: 'Ecuación íntegro-diferencial RLC analizada y resuelta con éxito.'
+      source: 'laplace_engine',
+      solution: laplaceSolution
     });
 
   } catch (error: unknown) {

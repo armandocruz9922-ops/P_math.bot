@@ -14,6 +14,7 @@ const PHASE_DETAILS: Record<ProcessingPhase, { title: string; subtitle: string; 
   uploading: { title: 'Cargando imagen del pizarrón...', subtitle: 'Optimizando resolución y balance de blancos', icon: '📸' },
   scanning_board: { title: 'Escaneando trazos de tiza...', subtitle: 'Segmentando caracteres manuscritos sobre la pizarra', icon: '🔍' },
   extracting_ocr: { title: 'Extrayendo fórmula matemática...', subtitle: 'Transcribiendo escritura manual a sintaxis LaTeX estándar', icon: '📐' },
+  validating_domain: { title: 'Validando Dominio de Laplace...', subtitle: 'Verificando pertenencia a Transformadas de Laplace y Sistemas Dinámicos', icon: '🛡️' },
   solving_math: { title: 'Calculando solución simbólica...', subtitle: 'Aplicando propiedades algebraicas y deducción paso a paso', icon: '🧠' },
   verifying_proof: { title: 'Verificando demostración formal...', subtitle: 'Comprobando igualdad por sustitución (LHS = RHS)', icon: '✨' },
   completed: { title: '¡Ecuación resuelta!', subtitle: 'Cargando desglose pedagógico', icon: '🎉' },

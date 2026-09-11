@@ -37,22 +37,22 @@ export const Navbar: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Logo & Brand */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 p-[1px] shadow-lg shadow-emerald-500/20 group-hover:shadow-emerald-500/30 transition-all duration-300">
-              <div className="w-full h-full rounded-xl bg-slate-950 flex items-center justify-center font-bold text-emerald-400 text-lg">
-                <span className="group-hover:scale-110 transition-transform duration-200">∫x</span>
+            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-500 to-teal-500 p-[1px] shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/30 transition-all duration-300">
+              <div className="w-full h-full rounded-xl bg-slate-950 flex items-center justify-center font-bold text-cyan-400 text-base">
+                <span className="group-hover:scale-110 transition-transform duration-200 font-mono">ℒ&#123;s&#125;</span>
               </div>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-white via-slate-100 to-emerald-300 bg-clip-text text-transparent">
-                  MathBoard
+                <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-white via-slate-100 to-cyan-300 bg-clip-text text-transparent">
+                  LaplaceControl
                 </span>
-                <span className="px-2 py-0.5 text-[11px] font-semibold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full">
-                  AI OCR 2.0
+                <span className="px-2 py-0.5 text-[11px] font-semibold tracking-wider uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded-full">
+                  Laplace & t_s
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
-                Recorte • Visión OCR • Graficador 2D • Demostración Paso a Paso
+                LaplaceCropper • Fracciones Parciales • Polos y Ceros • Tiempo de Asentamiento
               </p>
             </div>
           </Link>

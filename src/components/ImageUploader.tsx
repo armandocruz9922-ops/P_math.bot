@@ -6,7 +6,10 @@ import { useEquation } from '@/context/EquationContext';
 import { SAMPLE_EQUATIONS } from '@/lib/sample-equations';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { ProcessingOverlay } from './ProcessingOverlay';
-import { ImageCropper } from './ImageCropper';
+import { LaplaceCropper } from './LaplaceCropper';
+import { LatexEditor } from './LatexEditor';
+import { CalculationMode } from '@/lib/types';
+import { validateLaplaceDomain } from '@/lib/laplace-solver';
 import { 
   UploadCloud, 
   Camera, 
@@ -14,18 +17,25 @@ import {
   Sparkles, 
   CheckCircle2, 
   ArrowRight,
-  Layers,
-  Crop,
-  Image as ImageIcon,
-  RotateCcw
+  Layers, 
+  Crop, 
+  Image as ImageIcon, 
+  RotateCcw,
+  Sigma,
+  Activity,
+  ArrowDownUp,
+  ShieldAlert,
+  Edit3
 } from 'lucide-react';
 
 export const ImageUploader: React.FC = () => {
   const { 
     currentImage, 
     setCurrentImage, 
-    croppedImage,
+    croppedImage, 
     setCroppedImage,
+    calculationMode,
+    setCalculationMode,
     solveEquation, 
     isProcessing, 
     processingPhase, 
@@ -35,7 +45,11 @@ export const ImageUploader: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isCroppingOpen, setIsCroppingOpen] = useState(false);
-  const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null);
+  const [isEditingLatex, setIsEditingLatex] = useState(false);
+  const [manualLatex, setManualLatex] = useState<string>('');
+  const [selectedSampleId, setSelectedSampleId] = useState<string | null>('tf_subamortiguado');
+  const [domainAlert, setDomainAlert] = useState<{ show: boolean; message: string } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -80,64 +94,149 @@ export const ImageUploader: React.FC = () => {
         setSelectedSampleId(null);
         setCroppedImage(null);
         setCurrentImage(event.target.result as string);
-        // Automatically offer cropping for custom uploaded photos
         setIsCroppingOpen(true);
       }
     };
     reader.readAsDataURL(file);
   };
 
-  const handleSelectSample = (sampleId: string, imagePath: string) => {
+  const handleSelectSample = (sampleId: string, imagePath: string, mode: CalculationMode) => {
     setSelectedSampleId(sampleId);
     setCroppedImage(null);
     setCurrentImage(imagePath);
+    setCalculationMode(mode);
+    setDomainAlert(null);
   };
 
   const handleRemoveImage = () => {
     setCurrentImage(null);
     setCroppedImage(null);
     setSelectedSampleId(null);
+    setManualLatex('');
+    setDomainAlert(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   const handleSolve = async () => {
-    if (!currentImage && !croppedImage) return;
+    // Check domain restriction if manual latex is present
+    if (manualLatex && manualLatex.trim()) {
+      const validation = validateLaplaceDomain(manualLatex);
+      if (!validation.isValid) {
+        setDomainAlert({
+          show: true,
+          message: validation.message
+        });
+        return;
+      }
+    }
+
     await solveEquation(
       currentImage || undefined, 
       selectedSampleId || undefined, 
-      undefined, 
-      croppedImage || undefined
+      manualLatex || undefined, 
+      croppedImage || undefined,
+      calculationMode
     );
   };
+
+  // Sample active formula text
+  const currentSample = SAMPLE_EQUATIONS.find(s => s.id === selectedSampleId);
 
   return (
     <>
       <div className="w-full max-w-4xl mx-auto space-y-8">
         {/* Main Decorated Glass Panel */}
-        <div className="relative rounded-3xl bg-slate-900/80 border border-slate-800/90 backdrop-blur-2xl p-6 sm:p-10 shadow-2xl shadow-emerald-950/20 overflow-hidden">
+        <div className="relative rounded-3xl bg-slate-900/80 border border-slate-800/90 backdrop-blur-2xl p-6 sm:p-10 shadow-2xl shadow-cyan-950/20 overflow-hidden">
           {/* Subtle Ambient Light Gradients */}
-          <div className="absolute top-0 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
-          <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
+          <div className="absolute top-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
+          <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
 
           {/* Section Header */}
-          <div className="text-center max-w-xl mx-auto mb-8">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-3">
+          <div className="text-center max-w-2xl mx-auto mb-8">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 mb-3">
               <Sparkles className="w-3.5 h-3.5" />
-              Paso 1: Captura, Recorte y Digitalización
+              Pantalla 1: Captura, Recorte y Edición LaTeX
             </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Sube la foto de tu pizarra de clase
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              Análisis de Laplace y Estabilidad Dinámica
             </h2>
-            <p className="text-sm text-slate-400 mt-2">
-              Sube o toma una foto del pizarrón, recorta la región exacta de la ecuación y deja que nuestro motor genere la solución con gráficas y demostración.
+            <p className="text-xs sm:text-sm text-slate-300 mt-2">
+              Sube una foto de tu pizarrón o libreta, recorta la ecuación y obtén la transformada paso a paso, polos en el plano s y la gráfica del tiempo de asentamiento.
             </p>
           </div>
 
+          {/* Calculation Mode Selector Bar */}
+          <div className="mb-8">
+            <div className="flex items-center justify-center gap-1.5 p-1.5 rounded-2xl bg-slate-950 border border-slate-800 max-w-xl mx-auto text-xs">
+              <button
+                type="button"
+                onClick={() => setCalculationMode('transfer_function')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-bold transition cursor-pointer ${
+                  calculationMode === 'transfer_function'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Activity className="w-4 h-4" />
+                <span>G(s) Estabilidad & t_s</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCalculationMode('direct')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-bold transition cursor-pointer ${
+                  calculationMode === 'direct'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Sigma className="w-4 h-4" />
+                <span>ℒ&#123;f(t)&#125; Directa</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCalculationMode('inverse')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-bold transition cursor-pointer ${
+                  calculationMode === 'inverse'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <ArrowDownUp className="w-4 h-4" />
+                <span>ℒ⁻¹&#123;F(s)&#125; Inversa</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Domain Restriction Alert Modal/Banner */}
+          {domainAlert?.show && (
+            <div className="mb-6 p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 text-rose-300 flex items-start gap-3 animate-fade-in shadow-xl">
+              <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-xs">
+                <h4 className="font-bold text-rose-200">Restricción de Dominio Activada</h4>
+                <p className="leading-relaxed">{domainAlert.message}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCalculationMode('transfer_function');
+                    setSelectedSampleId('tf_subamortiguado');
+                    setManualLatex('');
+                    setDomainAlert(null);
+                  }}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-500/20 text-rose-200 border border-rose-500/30 hover:bg-rose-500/30 transition font-semibold cursor-pointer"
+                >
+                  <span>Cargar Problema Válido de Laplace (G(s) = 25/(s² + 4s + 25))</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Crop Mode or Normal Upload/Preview Area */}
           {isCroppingOpen && currentImage ? (
-            <ImageCropper
+            <LaplaceCropper
               imageSrc={currentImage}
               onCropComplete={(croppedDataUrl) => {
                 setCroppedImage(croppedDataUrl);
@@ -154,8 +253,8 @@ export const ImageUploader: React.FC = () => {
               onClick={() => fileInputRef.current?.click()}
               className={`relative group cursor-pointer rounded-2xl border-2 border-dashed transition-all duration-300 p-8 sm:p-12 text-center flex flex-col items-center justify-center ${
                 isDragging
-                  ? 'border-emerald-400 bg-emerald-500/10 scale-[1.01]'
-                  : 'border-slate-700/80 hover:border-emerald-500/60 bg-slate-950/40 hover:bg-slate-950/60'
+                  ? 'border-cyan-400 bg-cyan-500/10 scale-[1.01]'
+                  : 'border-slate-700/80 hover:border-cyan-500/60 bg-slate-950/40 hover:bg-slate-950/60'
               }`}
             >
               <input
@@ -167,16 +266,16 @@ export const ImageUploader: React.FC = () => {
               />
 
               <div className="relative mb-5">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-emerald-500/20 via-teal-500/20 to-cyan-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 group-hover:text-emerald-300 transition-all duration-300 shadow-lg shadow-emerald-500/10">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-cyan-500/20 via-blue-500/20 to-teal-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 group-hover:text-cyan-300 transition-all duration-300 shadow-lg shadow-cyan-500/10">
                   <UploadCloud className="w-10 h-10" />
                 </div>
               </div>
 
-              <h3 className="text-lg font-bold text-white mb-1.5 group-hover:text-emerald-300 transition-colors">
-                Arrastra tu imagen aquí o haz clic para explorar
+              <h3 className="text-lg font-bold text-white mb-1.5 group-hover:text-cyan-300 transition-colors">
+                Arrastra la foto de tu pizarrón o cuaderno aquí
               </h3>
               <p className="text-xs text-slate-400 max-w-sm mb-6">
-                Formatos compatibles: JPG, PNG, WEBP, SVG. Admite fotos con iluminación variable sobre pizarrón verde o negro.
+                Especializado en fórmulas con tiza manuscrita de funciones de transferencia G(s), transformada ℒ&#123;f(t)&#125; o fracciones parciales.
               </p>
 
               {/* Dual Action Buttons */}
@@ -184,10 +283,10 @@ export const ImageUploader: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all cursor-pointer"
                 >
                   <UploadCloud className="w-4 h-4" />
-                  <span>Seleccionar Archivo</span>
+                  <span>Seleccionar Imagen</span>
                 </button>
 
                 <button
@@ -195,42 +294,42 @@ export const ImageUploader: React.FC = () => {
                   onClick={() => setIsCameraOpen(true)}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 font-semibold text-xs transition-all cursor-pointer"
                 >
-                  <Camera className="w-4 h-4 text-emerald-400" />
-                  <span>Tomar Foto con Cámara</span>
+                  <Camera className="w-4 h-4 text-cyan-400" />
+                  <span>Tomar Foto del Pizarrón</span>
                 </button>
               </div>
             </div>
           ) : (
             /* Preview State Card with Cropping controls */
             <div className="space-y-6">
-              <div className="relative rounded-2xl overflow-hidden border border-emerald-500/40 bg-slate-950 shadow-xl group">
+              <div className="relative rounded-2xl overflow-hidden border border-cyan-500/40 bg-slate-950 shadow-xl group">
                 <div className="relative w-full max-h-[420px] aspect-video sm:aspect-[16/9] flex items-center justify-center bg-slate-950 p-2">
                   <img
                     src={croppedImage || currentImage}
-                    alt="Pizarrón escolar capturado"
+                    alt="Ecuación de Laplace capturada"
                     className="w-full h-full object-contain rounded-xl"
                   />
 
                   {/* Chalkboard status badge */}
-                  <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-semibold backdrop-blur-md">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{croppedImage ? 'Área de Tiza Recortada' : 'Pizarrón Listo para Análisis'}</span>
+                  <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-950/85 border border-cyan-500/40 text-cyan-300 text-xs font-semibold backdrop-blur-md">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{croppedImage ? 'Ecuación Recortada para OCR' : 'Foto Lista para Análisis'}</span>
                   </div>
 
                   {/* Actions overlay */}
                   <div className="absolute top-4 right-4 flex items-center gap-2">
                     <button
                       onClick={() => setIsCroppingOpen(true)}
-                      title="Recortar y ajustar área de la ecuación"
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold shadow-lg backdrop-blur-md transition cursor-pointer"
+                      title="Encuadrar la fórmula con LaplaceCropper"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold shadow-lg backdrop-blur-md transition cursor-pointer"
                     >
-                      <Crop className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>{croppedImage ? 'Volver a Recortar' : 'Recortar Área'}</span>
+                      <Crop className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>{croppedImage ? 'Volver a Recortar' : 'Recortar Pizarrón'}</span>
                     </button>
 
                     <button
                       onClick={handleRemoveImage}
-                      title="Eliminar y elegir otra foto"
+                      title="Eliminar foto"
                       className="p-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 hover:text-rose-100 transition shadow-lg backdrop-blur-md cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -241,13 +340,13 @@ export const ImageUploader: React.FC = () => {
                 {/* Subtitle status bar */}
                 <div className="p-4 bg-slate-900/90 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-2 text-slate-300">
-                    <ImageIcon className="w-4 h-4 text-emerald-400" />
+                    <ImageIcon className="w-4 h-4 text-cyan-400" />
                     <span>
                       {selectedSampleId 
-                        ? 'Ejemplo Escolar Seleccionado' 
+                        ? `Ejemplo: ${currentSample?.title}` 
                         : croppedImage 
-                        ? 'Foto Recortada y Optimizada para OCR' 
-                        : 'Foto Original Subida'}
+                        ? 'Imagen Recortada y Optimizada' 
+                        : 'Foto Subida'}
                     </span>
                   </div>
 
@@ -263,7 +362,7 @@ export const ImageUploader: React.FC = () => {
                     )}
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="text-emerald-400 hover:text-emerald-300 font-medium hover:underline cursor-pointer"
+                      className="text-cyan-400 hover:text-cyan-300 font-medium hover:underline cursor-pointer"
                     >
                       Cambiar foto
                     </button>
@@ -280,43 +379,52 @@ export const ImageUploader: React.FC = () => {
                 className="hidden"
               />
 
-              {/* Detected Equation Confirmation Box */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/90 border border-slate-800 shadow-inner space-y-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-slate-300 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                    Fórmula a resolver:
-                  </span>
-                  <span className="text-[11px] text-emerald-400 font-mono">
-                    {selectedSampleId === 'cuadratica' ? '2x² + 5x - 3 = 0' : selectedSampleId === 'lineal' ? '3x - 7 = 14' : '= L di/dt + Ri + 1/C ∫ i dt'}
-                  </span>
+              {/* LaTeX Editor Section (if editing) or Detected Equation Card */}
+              {isEditingLatex ? (
+                <LatexEditor
+                  initialLatex={manualLatex || currentSample?.latex || 'G(s) = \\frac{25}{s^2 + 4s + 25}'}
+                  onApply={(newLatex) => {
+                    setManualLatex(newLatex);
+                    setIsEditingLatex(false);
+                  }}
+                  onCancel={() => setIsEditingLatex(false)}
+                />
+              ) : (
+                <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/90 border border-slate-800 shadow-inner space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                      Fórmula detectada en el pizarrón:
+                    </span>
+                    <button
+                      onClick={() => setIsEditingLatex(true)}
+                      className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Editar LaTeX</span>
+                    </button>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-900 border border-slate-800/80 flex items-center justify-center overflow-x-auto text-sm font-mono text-cyan-300">
+                    {manualLatex || currentSample?.latex || 'G(s) = \\frac{25}{s^2 + 4s + 25}'}
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 text-center">
+                    💡 Puedes corregir o ingresar cualquier función en LaTeX antes de procesar haciendo clic en &quot;Editar LaTeX&quot;.
+                  </p>
                 </div>
+              )}
 
-                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800/80 flex items-center justify-center overflow-x-auto text-sm">
-                  {selectedSampleId === 'cuadratica' ? (
-                    <span className="font-mono text-emerald-300">2x^2 + 5x - 3 = 0</span>
-                  ) : selectedSampleId === 'lineal' ? (
-                    <span className="font-mono text-emerald-300">3x - 7 = 14</span>
-                  ) : (
-                    <span className="font-mono text-emerald-300">v(t) = L \frac&#123;di(t)&#125;&#123;dt&#125; + R i(t) + \frac&#123;1&#125;&#123;C&#125; \int_0^t i(\tau) \, d\tau</span>
-                  )}
-                </div>
-
-                <p className="text-[11px] text-slate-400 text-center">
-                  💡 Tip: Puedes ingresar tu Google Gemini API Key en Configuración (icono ⚙️ arriba) para transcribir automáticamente cualquier otra foto manuscrita por visión AI.
-                </p>
-              </div>
-
-              {/* Big Action Button: Resolver Ecuación */}
+              {/* Big Action Button: Resolver Laplace & Analizar Estabilidad */}
               <div className="flex justify-center pt-2">
                 <button
                   type="button"
                   onClick={handleSolve}
                   disabled={isProcessing}
-                  className="w-full sm:w-auto min-w-[280px] flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:via-teal-400 hover:to-cyan-400 text-slate-950 font-black text-base tracking-wide shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer disabled:opacity-50"
+                  className="w-full sm:w-auto min-w-[320px] flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-teal-500 hover:from-cyan-400 hover:via-blue-500 hover:to-teal-400 text-slate-950 font-black text-base tracking-wide shadow-xl shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer disabled:opacity-50"
                 >
-                  <Sparkles className="w-5 h-5 text-slate-950" />
-                  <span>RESOLVER ECUACIÓN</span>
+                  <Activity className="w-5 h-5 text-slate-950" />
+                  <span>CALCULAR LAPLACE Y GRAFICAR ESTABILIDAD</span>
                   <ArrowRight className="w-5 h-5 text-slate-950" />
                 </button>
               </div>
@@ -327,42 +435,42 @@ export const ImageUploader: React.FC = () => {
           <div className="mt-10 pt-8 border-t border-slate-800/80">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-emerald-400" />
+                <Layers className="w-4 h-4 text-cyan-400" />
                 <h4 className="text-sm font-bold text-white">
-                  O prueba al instante con estos pizarrones de clase de muestra:
+                  O prueba con estos pizarrones universitarios de Laplace y Sistemas de Control:
                 </h4>
               </div>
-              <span className="text-[11px] text-slate-400 hidden sm:inline">1 clic para probar</span>
+              <span className="text-[11px] text-slate-400 hidden sm:inline">1 clic para cargar</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {SAMPLE_EQUATIONS.map((sample) => {
                 const isSelected = selectedSampleId === sample.id;
                 return (
                   <button
                     key={sample.id}
                     type="button"
-                    onClick={() => handleSelectSample(sample.id, sample.imagePath)}
-                    className={`relative p-3 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer group overflow-hidden ${
+                    onClick={() => handleSelectSample(sample.id, sample.imagePath, sample.calculationMode)}
+                    className={`relative p-3.5 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer group overflow-hidden ${
                       isSelected
-                        ? 'border-emerald-400 bg-emerald-950/30 shadow-lg shadow-emerald-500/15 ring-1 ring-emerald-400'
+                        ? 'border-cyan-400 bg-cyan-950/30 shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-400'
                         : 'border-slate-800 bg-slate-950/50 hover:border-slate-700 hover:bg-slate-900/60'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-800 text-slate-300">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-800 text-cyan-300 border border-slate-700">
                         {sample.badge}
                       </span>
                       {isSelected && (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <CheckCircle2 className="w-4 h-4 text-cyan-400" />
                       )}
                     </div>
 
                     <div className="mb-2">
-                      <p className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors">
+                      <p className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors">
                         {sample.title}
                       </p>
-                      <p className="text-[11px] font-mono text-emerald-400/90 mt-0.5">
+                      <p className="text-[11px] font-mono text-cyan-400/90 mt-0.5">
                         {sample.subtitle}
                       </p>
                     </div>
