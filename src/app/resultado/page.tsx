@@ -10,6 +10,7 @@ import { StabilityGraph } from '@/components/StabilityGraph';
 import { LatexEditor } from '@/components/LatexEditor';
 import { VerificationCard } from '@/components/VerificationCard';
 import { StepExplainerModal } from '@/components/StepExplainerModal';
+import { GreenBlackboardModal } from '@/components/GreenBlackboardModal';
 import confetti from 'canvas-confetti';
 import { 
   ArrowLeft, 
@@ -21,7 +22,7 @@ import {
   Edit3, 
   Check, 
   Award,
-  Layers,
+  Layers, 
   HelpCircle,
   Share2,
   Printer,
@@ -32,7 +33,8 @@ import {
   ShieldCheck,
   AlertTriangle,
   XCircle,
-  FileText
+  FileText,
+  Code2
 } from 'lucide-react';
 import { EquationStep } from '@/lib/types';
 
@@ -53,6 +55,7 @@ export default function ResultPage() {
 
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [isEditingLatex, setIsEditingLatex] = useState(false);
+  const [isGreenBoardOpen, setIsGreenBoardOpen] = useState(false);
   const [copiedLatex, setCopiedLatex] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -145,6 +148,16 @@ export default function ResultPage() {
         </button>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Green Blackboard tcolorbox Export Button */}
+          <button
+            onClick={() => setIsGreenBoardOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-xs font-semibold shadow-sm transition cursor-pointer"
+            title="Ver y exportar código LaTeX con estilo Pizarrón Verde (tcolorbox)"
+          >
+            <Code2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span>LaTeX Pizarrón Verde</span>
+          </button>
+
           {/* Copy LaTeX Button */}
           <button
             onClick={handleCopyLatexOnly}
@@ -217,7 +230,7 @@ export default function ResultPage() {
         <div className="lg:col-span-8 rounded-3xl bg-gradient-to-br from-slate-900/95 via-slate-900 to-slate-950 border border-slate-800/90 p-6 sm:p-8 backdrop-blur-xl shadow-xl flex flex-col justify-between relative overflow-hidden space-y-5 print:border-gray-300">
           <div className="absolute -top-16 -right-16 w-48 h-48 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
 
-          {/* 1. SECCIÓN SUPERIOR (NUEVA): Fórmula Detectada en la Imagen (Dominio del Tiempo f(t)) */}
+          {/* 1. SECCIÓN SUPERIOR: Fórmula Detectada en la Imagen (Dominio del Tiempo f(t)) */}
           <div className="rounded-2xl bg-slate-950/70 border border-amber-500/30 p-4 sm:p-5 shadow-inner space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -226,12 +239,31 @@ export default function ResultPage() {
                   Fórmula Detectada en la Imagen (Dominio del Tiempo f(t))
                 </h4>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 font-mono">
-                Dominio Temporal (t) | Texto Literal OCR
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsGreenBoardOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition cursor-pointer"
+                  title="Ver código LaTeX para Pizarrón Verde compilable con tcolorbox"
+                >
+                  <Code2 className="w-3 h-3 text-emerald-400" />
+                  <span>Ver código tcolorbox</span>
+                </button>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 font-mono">
+                  Dominio Temporal (t) | Texto Literal OCR
+                </span>
+              </div>
             </div>
 
-            <div className="py-3 px-4 rounded-xl bg-slate-900/80 border border-slate-800/80 flex items-center justify-center overflow-x-auto my-1">
+            {/* Pizarrón Verde preview container */}
+            <div 
+              style={{
+                backgroundColor: 'rgb(20, 65, 40)',
+                borderColor: 'rgb(110, 70, 40)',
+                borderWidth: '4px',
+                borderStyle: 'solid'
+              }}
+              className="py-3 px-4 rounded-xl flex items-center justify-center overflow-x-auto my-1 shadow-lg text-white"
+            >
               <MathRenderer 
                 math={currentSolution.timeDomainLatex || currentSolution.detectedLatex} 
                 displayMode={true} 
@@ -416,6 +448,13 @@ export default function ResultPage() {
           </div>
         </div>
       )}
+
+      {/* Green Blackboard Compilable LaTeX (tcolorbox) Modal */}
+      <GreenBlackboardModal
+        isOpen={isGreenBoardOpen}
+        onClose={() => setIsGreenBoardOpen(false)}
+        equationLatex={currentSolution.timeDomainLatex || currentSolution.detectedLatex}
+      />
     </div>
   );
 }

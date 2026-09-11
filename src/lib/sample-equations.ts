@@ -3,6 +3,17 @@ import { solveTransferFunction, solveInverseLaplace, solveDirectLaplace } from '
 
 export const SAMPLE_EQUATIONS: SampleBlackboard[] = [
   {
+    id: 'circuito_rlc',
+    title: 'Circuito RLC Integro-Diferencial',
+    subtitle: '= L di/dt + R i + (1/C) ∫ i dt',
+    latex: '= L \\frac{di(t)}{dt} + R i(t) + \\frac{1}{C} \\int_{0}^{t} i(t) \\, dt',
+    calculationMode: 'transfer_function',
+    equationType: 'Circuito Eléctrico RLC',
+    imagePath: '/samples/pizarron-rlc.svg',
+    badge: 'RLC Serie',
+    stabilityStatus: 'stable'
+  },
+  {
     id: 'tf_subamortiguado',
     title: 'Función de Transferencia 2° Orden',
     subtitle: 'G(s) = 25 / (s² + 4s + 25)',
@@ -61,6 +72,12 @@ export const SAMPLE_EQUATIONS: SampleBlackboard[] = [
 
 export function getSampleSolution(sampleId: string): EquationSolution {
   switch (sampleId) {
+    case 'circuito_rlc': {
+      const sol = solveTransferFunction(1, 1, 10, 25, '/samples/pizarron-rlc.svg', 'sample', 'G(s) = \\frac{s}{s^2 + 10s + 25}');
+      sol.timeDomainLatex = '= L \\frac{di(t)}{dt} + R i(t) + \\frac{1}{C} \\int_{0}^{t} i(t) \\, dt, \\quad R=10\\Omega, \\; L=1H, \\; C=0.04F';
+      sol.equationType = 'Circuito RLC Integro-Diferencial';
+      return sol;
+    }
     case 'laplace_inversa':
       return solveInverseLaplace('3s + 5', -1, -2, '/samples/pizarron-cuadratica.svg', 'sample');
     case 'laplace_directa':
